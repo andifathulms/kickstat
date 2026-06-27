@@ -7,7 +7,15 @@ import type {
   Standing,
 } from "./types";
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+// Browser calls go to the publicly-published backend URL; server-side rendering
+// (inside the frontend container) must reach the backend over the internal Docker
+// network. INTERNAL_API_URL covers the latter and is only read on the server.
+const PUBLIC_API_URL =
+  process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_URL =
+  typeof window === "undefined"
+    ? process.env.INTERNAL_API_URL || PUBLIC_API_URL
+    : PUBLIC_API_URL;
 
 type FetchOpts = { revalidate?: number };
 
