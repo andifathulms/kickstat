@@ -25,6 +25,17 @@ FEATURE_ORDER = [
     "away_xg_avg",
 ]
 
+# Phase 2 (XGBoost) adds: shots-on-target ratio, days-rest fatigue proxy, and a
+# home/away venue-specific form split — on top of every Phase 1 feature.
+FEATURE_ORDER_V2 = FEATURE_ORDER + [
+    "home_sot_ratio",
+    "away_sot_ratio",
+    "home_days_rest",
+    "away_days_rest",
+    "home_venue_form_pts",
+    "away_venue_form_pts",
+]
+
 
 def _recent_finished(team, before, limit=5):
     return list(
@@ -141,9 +152,78 @@ def get_features(match_id: int) -> dict:
     }
 
 
-def features_to_vector(features: dict) -> list:
+def _sot_ratio(team, matches):
+    """Shots-on-target / total-shots over recent matches (0..1)."""
+    sot, shots = 0, 0
+    for m in matches:
+        stats = getattr(m, "stats", None)
+        if stats is None:
+            continue
+        is_home = m.home_team_id == team.id
+        s = stats.home_shots if is_home else stats.away_shots
+        t = stats.home_shots_on_target if is_home else stats.away_shots_on_target
+        if s:
+            shots += s
+            sot += t or 0
+    return round(sot / shots, 3) if shots else 0.0
+
+
+def _days_rest(matches, before):
+    """Days between this kickoff and the team's most recent finished match."""
+    if not matches:
+        return 0
+    last = matches[0].kickoff  # most recent (queryset ordered -kickoff)
+    delta = (before - last).days
+    return max(delta, 0)
+
+
+def _venue_form_pts(team, before, is_home_fixture, limit=5):
+    """Form points from the team's last N matches *at the same venue*."""
+    if is_home_fixture:
+        qs = Match.objects.filter(home_team=team)
+    else:
+        qs = Match.objects.filter(away_team=team)
+    recent = list(
+        qs.filter(status=MatchStatus.FINISHED, kickoff__lt=before)
+        .order_by("-kickoff")[:limit]
+    )
+    return _points_for(team, recent)
+
+
+def get_features_v2(match_id: int) -> dict:
+    """Phase 2 feature dict: all Phase 1 features plus venue/fatigue/SOT signals."""
+    match = Match.objects.select_related(
+        "home_team", "away_team", "league"
+    ).get(pk=match_id)
+    home, away, before = match.home_team, match.away_team, match.kickoff
+
+    features = get_features(match_id)
+    home_recent = _recent_finished(home, before)
+    away_recent = _recent_finished(away, before)
+
+    features.update(
+        {
+            "home_sot_ratio": _sot_ratio(home, home_recent),
+            "away_sot_ratio": _sot_ratio(away, away_recent),
+            "home_days_rest": _days_rest(home_recent, before),
+            "away_days_rest": _days_rest(away_recent, before),
+            "home_venue_form_pts": _venue_form_pts(home, before, is_home_fixture=True),
+            "away_venue_form_pts": _venue_form_pts(away, before, is_home_fixture=False),
+        }
+    )
+    return features
+
+
+def features_to_vector(features: dict, order=FEATURE_ORDER) -> list:
     """Flatten a feature dict into an ordered vector for the model."""
-    return [features[name] for name in FEATURE_ORDER]
+    return [features[name] for name in order]
+
+
+# Registry mapping a model's feature-set name to its (builder, ordered keys).
+FEATURE_SETS = {
+    "v1": (get_features, FEATURE_ORDER),
+    "v2": (get_features_v2, FEATURE_ORDER_V2),
+}
 
 
 def label_for(match: Match) -> str:

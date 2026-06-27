@@ -9,7 +9,7 @@ from apps.predictions.models import MatchPrediction, Outcome
 from apps.predictions.tasks import evaluate_predictions, run_daily_predictions
 from ml import predict, train
 
-from .test_ml import seed_history
+from .test_ml import clean_models, seed_history
 
 
 class RunDailyPredictionsTests(TestCase):
@@ -25,19 +25,15 @@ class RunDailyPredictionsTests(TestCase):
         )
 
     def tearDown(self):
-        if train.MODEL_PATH.exists():
-            train.MODEL_PATH.unlink()
-        predict._cache.clear()
+        clean_models()
 
     def test_returns_model_not_found_without_model(self):
-        if train.MODEL_PATH.exists():
-            train.MODEL_PATH.unlink()
-        predict._cache.clear()
+        clean_models()
         result = run_daily_predictions()
         self.assertEqual(result, {"error": "model_not_found"})
 
     def test_creates_predictions_for_today(self):
-        train.train()
+        train.train("v1")
         result = run_daily_predictions()
         self.assertEqual(result["created"], 1)
         self.assertTrue(
