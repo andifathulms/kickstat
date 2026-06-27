@@ -1,0 +1,13 @@
+/* Kickstat design tokens — "Pitch Dark" (PRD Design System).
+   Mirrored in tailwind.config.ts; use Tailwind classes in components. */
+:root {
+  --pitch-black: #0d0f12;
+  --surface: #161a1f;
+  --surface-raised: #1e232a;
+  --border: #2a3038;
+  --grass-green: #00d46a;
+  --amber-goal: #ffb800;
+  --red-card: #ff3b3b;
+  --text-primary: #f0f2f5;
+  --text-secondary: #8a96a3;
+}

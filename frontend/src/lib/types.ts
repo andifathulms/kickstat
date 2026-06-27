@@ -1,0 +1,109 @@
+export type MatchStatus =
+  | "SCHEDULED"
+  | "LIVE"
+  | "FINISHED"
+  | "POSTPONED"
+  | "CANCELLED";
+
+export type Outcome = "HOME" | "DRAW" | "AWAY";
+
+export interface Paginated<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
+}
+
+export interface League {
+  id: number;
+  name: string;
+  slug: string;
+  country: string;
+  source: string;
+  season: string;
+  is_active: boolean;
+}
+
+export interface TeamMini {
+  id: number;
+  name: string;
+  short_name: string;
+  logo_url: string;
+}
+
+export interface Standing {
+  id: number;
+  season: string;
+  position: number;
+  team: TeamMini;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  goals_for: number;
+  goals_against: number;
+  goal_difference: number;
+  points: number;
+}
+
+export interface MatchStats {
+  home_possession: number | null;
+  away_possession: number | null;
+  home_shots: number | null;
+  away_shots: number | null;
+  home_shots_on_target: number | null;
+  away_shots_on_target: number | null;
+  home_corners: number | null;
+  away_corners: number | null;
+  home_fouls: number | null;
+  away_fouls: number | null;
+  home_yellow_cards: number | null;
+  away_yellow_cards: number | null;
+  home_red_cards: number | null;
+  away_red_cards: number | null;
+  home_xg: number | null;
+  away_xg: number | null;
+}
+
+export interface MatchEvent {
+  id: number;
+  minute: number | null;
+  type: "GOAL" | "YELLOW" | "RED" | "SUBSTITUTION" | "VAR";
+  team: TeamMini | null;
+  player_name: string | null;
+  detail: Record<string, unknown>;
+}
+
+export interface Prediction {
+  id: number;
+  match: number | MatchListItem;
+  home_win_prob: number;
+  draw_prob: number;
+  away_win_prob: number;
+  predicted_outcome: Outcome;
+  model_version: string;
+  confidence_score: number;
+  was_correct: boolean | null;
+  created_at: string;
+}
+
+export interface MatchListItem {
+  id: number;
+  league: number;
+  league_name: string;
+  league_slug: string;
+  matchday: number | null;
+  kickoff: string;
+  status: MatchStatus;
+  home_team: TeamMini;
+  away_team: TeamMini;
+  home_score: number | null;
+  away_score: number | null;
+}
+
+export interface MatchDetail extends Omit<MatchListItem, "league"> {
+  league: League;
+  stats: MatchStats | null;
+  events: MatchEvent[];
+  prediction: Prediction | null;
+}
