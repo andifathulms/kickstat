@@ -1,4 +1,4 @@
-from django.db.models import Q
+from django.db.models import Count, Max, Min, Q
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -26,6 +26,33 @@ class LeagueViewSet(viewsets.ReadOnlyModelViewSet):
         if value.isdigit():
             return qs.get(pk=value)
         return qs.get(slug=value)
+
+    @action(detail=False)
+    def archive(self, request):
+        """Historical (non-live) leagues with match counts and year span."""
+        qs = (
+            League.objects.filter(is_active=False)
+            .annotate(
+                match_count=Count("matches"),
+                first_year=Min("matches__kickoff"),
+                last_year=Max("matches__kickoff"),
+            )
+            .filter(match_count__gt=0)
+            .order_by("-match_count")
+        )
+        data = [
+            {
+                "id": l.id,
+                "name": l.name,
+                "slug": l.slug,
+                "country": l.country,
+                "match_count": l.match_count,
+                "first_year": l.first_year.year if l.first_year else None,
+                "last_year": l.last_year.year if l.last_year else None,
+            }
+            for l in qs
+        ]
+        return Response(data)
 
     @action(detail=True)
     def standings(self, request, pk=None):

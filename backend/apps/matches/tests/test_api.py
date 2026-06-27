@@ -44,6 +44,21 @@ class MatchAPITests(APITestCase):
         self.assertEqual(body["prediction"]["predicted_outcome"], "HOME")
         self.assertIsInstance(body["league"], dict)
 
+    def test_list_with_stats_includes_nested_stats(self):
+        resp = self.client.get("/api/matches/?with_stats=true&status=LIVE")
+        self.assertEqual(resp.status_code, 200)
+        results = resp.json()["results"]
+        self.assertIn("stats", results[0])
+        self.assertEqual(results[0]["stats"]["home_possession"], 58)
+
+    def test_list_without_stats_omits_stats(self):
+        resp = self.client.get("/api/matches/?status=LIVE")
+        self.assertNotIn("stats", resp.json()["results"][0])
+
+    def test_list_ordering_desc(self):
+        resp = self.client.get("/api/matches/?ordering=-kickoff")
+        self.assertEqual(resp.status_code, 200)
+
     def test_live_endpoint_only_live(self):
         make_match(
             self.league, self.home, self.away, external_id="sched",

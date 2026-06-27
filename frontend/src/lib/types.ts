@@ -107,3 +107,17 @@ export interface MatchDetail extends Omit<MatchListItem, "league"> {
   events: MatchEvent[];
   prediction: Prediction | null;
 }
+
+export interface MatchWithStats extends MatchListItem {
+  stats: MatchStats | null;
+}
+
+export interface ArchiveLeague {
+  id: number;
+  name: string;
+  slug: string;
+  country: string;
+  match_count: number;
+  first_year: number | null;
+  last_year: number | null;
+}

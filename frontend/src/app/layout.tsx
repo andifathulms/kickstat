@@ -20,6 +20,7 @@ const NAV = [
   { href: "/", label: "Home" },
   { href: "/standings", label: "Standings" },
   { href: "/predictions", label: "Predictions" },
+  { href: "/history", label: "History" },
 ];
 
 export default function RootLayout({

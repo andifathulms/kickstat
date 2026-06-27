@@ -45,6 +45,15 @@ class MatchListSerializer(serializers.ModelSerializer):
         )
 
 
+class MatchListWithStatsSerializer(MatchListSerializer):
+    """Compact match payload plus nested stats — for the history/archive list."""
+
+    stats = MatchStatsSerializer(read_only=True)
+
+    class Meta(MatchListSerializer.Meta):
+        fields = MatchListSerializer.Meta.fields + ("stats",)
+
+
 class MatchDetailSerializer(MatchListSerializer):
     """Full match payload: nested league, stats, events, prediction."""
 

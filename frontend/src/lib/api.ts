@@ -1,7 +1,9 @@
 import type {
+  ArchiveLeague,
   League,
   MatchDetail,
   MatchListItem,
+  MatchWithStats,
   Paginated,
   Prediction,
   Standing,
@@ -51,6 +53,29 @@ export const getMatch = (id: string | number) =>
   get<MatchDetail>(`/matches/${id}/`, { revalidate: 30 });
 export const getMatchesByDate = (date: string) =>
   get<Paginated<MatchListItem>>(`/matches/?date=${date}`);
+
+// Archive / history
+export const getArchiveLeagues = () =>
+  get<ArchiveLeague[]>("/leagues/archive/", { revalidate: 600 });
+
+export function getHistoryMatches(params: {
+  league: number;
+  page?: number;
+  dateFrom?: string;
+  dateTo?: string;
+}) {
+  const q = new URLSearchParams({
+    league: String(params.league),
+    with_stats: "true",
+    ordering: "-kickoff",
+    page: String(params.page ?? 1),
+  });
+  if (params.dateFrom) q.set("date_from", params.dateFrom);
+  if (params.dateTo) q.set("date_to", params.dateTo);
+  return get<Paginated<MatchWithStats>>(`/matches/?${q.toString()}`, {
+    revalidate: 600,
+  });
+}
 
 // Predictions
 export const getTodayPredictions = () =>

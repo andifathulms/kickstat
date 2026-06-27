@@ -37,6 +37,26 @@ class LeagueAPITests(APITestCase):
         resp = self.client.get(f"/api/leagues/{self.league.slug}/standings/")
         self.assertEqual(resp.status_code, 200)
 
+    def test_archive_lists_historical_leagues_with_counts(self):
+        hist = make_league(
+            name="Premier League (history)", external_id="fduk-E0", is_active=False
+        )
+        a = make_team(hist, name="A", external_id="ha")
+        b = make_team(hist, name="B", external_id="hb")
+        make_match(
+            hist, a, b, external_id="h1", status=MatchStatus.FINISHED,
+            home_score=1, away_score=0, kickoff=timezone.now() - timedelta(days=400),
+        )
+        resp = self.client.get("/api/leagues/archive/")
+        self.assertEqual(resp.status_code, 200)
+        entries = resp.json()
+        slugs = [e["slug"] for e in entries]
+        self.assertIn(hist.slug, slugs)
+        self.assertNotIn(self.league.slug, slugs)  # active league excluded
+        entry = next(e for e in entries if e["slug"] == hist.slug)
+        self.assertEqual(entry["match_count"], 1)
+        self.assertEqual(entry["first_year"], entry["last_year"])
+
     def test_fixtures_excludes_finished(self):
         make_match(self.league, self.home, self.away, external_id="up", status=MatchStatus.SCHEDULED)
         make_match(

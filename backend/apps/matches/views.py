@@ -9,12 +9,18 @@ from .serializers import (
     MatchDetailSerializer,
     MatchEventSerializer,
     MatchListSerializer,
+    MatchListWithStatsSerializer,
     MatchStatsSerializer,
 )
 
 
 class MatchViewSet(viewsets.ReadOnlyModelViewSet):
     filterset_class = MatchFilter
+    ordering_fields = ["kickoff"]
+    ordering = ["kickoff"]
+
+    def _wants_stats(self):
+        return self.request.query_params.get("with_stats") in ("1", "true", "True")
 
     def get_queryset(self):
         qs = Match.objects.select_related(
@@ -24,11 +30,15 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
             qs = qs.select_related("stats").prefetch_related(
                 "events__team", "events__player", "prediction"
             )
+        elif self._wants_stats():
+            qs = qs.select_related("stats")
         return qs.order_by("kickoff")
 
     def get_serializer_class(self):
         if self.action == "retrieve":
             return MatchDetailSerializer
+        if self.action == "list" and self._wants_stats():
+            return MatchListWithStatsSerializer
         return MatchListSerializer
 
     @action(detail=False)
