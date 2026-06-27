@@ -48,10 +48,15 @@ _ALIASES = {
     "paris sg": "paris saint germain",
     "psg": "paris saint germain",
     "st etienne": "saint etienne",
+    "olympique lyonnais": "lyon",
+    "stade brestois 29": "brest",
+    "stade rennais 1901": "rennes",
     "ajax": "ajax",
     "psv eindhoven": "psv",
     "sporting": "sporting cp",
     "porto": "fc porto",
+    "sporting clube de braga": "sp braga",
+    "vitoria": "guimaraes",
 }
 
 
