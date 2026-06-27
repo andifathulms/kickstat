@@ -44,6 +44,15 @@ class Team(BaseModel):
     external_id = models.CharField(max_length=64, db_index=True)
     logo_url = models.URLField(blank=True)
     source = models.CharField(max_length=20, choices=Source.choices)
+    # Links historical/alias team rows (e.g. football-data.co.uk "Man City") to a
+    # canonical live team ("Manchester City FC") so match history is unified.
+    canonical = models.ForeignKey(
+        "self",
+        related_name="aliases",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
 
     class Meta:
         ordering = ["name"]
@@ -55,6 +64,17 @@ class Team(BaseModel):
 
     def __str__(self):
         return self.name
+
+    @property
+    def canonical_or_self(self):
+        return self.canonical or self
+
+    def canonical_group_ids(self):
+        """All team ids that share this team's canonical identity (incl. self)."""
+        root = self.canonical_or_self
+        ids = {root.id}
+        ids.update(root.aliases.values_list("id", flat=True))
+        return ids
 
 
 class Player(BaseModel):
