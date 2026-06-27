@@ -9,7 +9,7 @@ Match / MatchStats rows. This is training data only — not used for live displa
 from datetime import datetime, timezone
 
 import requests
-from django.core.management.base import BaseCommand
+from django.core.management.base import BaseCommand, CommandError
 
 from apps.leagues.models import League, Source, Team
 from apps.matches.models import Match, MatchStats, MatchStatus
@@ -27,20 +27,55 @@ class Command(BaseCommand):
     help = "Ingest StatsBomb open data (matches + xG) for a competition/season."
 
     def add_arguments(self, parser):
-        parser.add_argument("--competition", type=int, required=True)
-        parser.add_argument("--season", type=int, required=True)
+        parser.add_argument("--competition", type=int)
+        parser.add_argument("--season", type=int)
         parser.add_argument(
-            "--limit", type=int, default=0, help="Cap matches ingested (0 = all)."
+            "--all",
+            action="store_true",
+            help="Ingest every competition/season in the StatsBomb open-data index.",
+        )
+        parser.add_argument(
+            "--limit", type=int, default=0, help="Cap matches per season (0 = all)."
         )
 
     def handle(self, *args, **options):
-        comp_id = options["competition"]
-        season_id = options["season"]
         limit = options["limit"]
 
+        if options["all"]:
+            pairs = self._all_competition_seasons()
+            self.stdout.write(f"Found {len(pairs)} competition/season pairs.")
+        else:
+            if options["competition"] is None or options["season"] is None:
+                raise CommandError(
+                    "Provide --competition and --season, or use --all."
+                )
+            pairs = [(options["competition"], options["season"])]
+
+        grand_total = 0
+        for comp_id, season_id in pairs:
+            grand_total += self._ingest_competition_season(comp_id, season_id, limit)
+        self.stdout.write(
+            self.style.SUCCESS(f"Ingested {grand_total} matches with xG in total.")
+        )
+
+    def _all_competition_seasons(self):
+        index = _get(f"{RAW_BASE}/competitions.json")
+        # Deduplicate (competition_id, season_id) pairs.
+        seen = []
+        for entry in index:
+            pair = (entry["competition_id"], entry["season_id"])
+            if pair not in seen:
+                seen.append(pair)
+        return seen
+
+    def _ingest_competition_season(self, comp_id, season_id, limit):
         matches_url = f"{RAW_BASE}/matches/{comp_id}/{season_id}.json"
         self.stdout.write(f"Fetching {matches_url}")
-        matches = _get(matches_url)
+        try:
+            matches = _get(matches_url)
+        except requests.HTTPError as exc:
+            self.stderr.write(f"  skipped {comp_id}/{season_id}: {exc}")
+            return 0
         if limit:
             matches = matches[:limit]
 
@@ -50,8 +85,9 @@ class Command(BaseCommand):
             try:
                 created += self._ingest_match(sb_match, league)
             except requests.HTTPError as exc:
-                self.stderr.write(f"Skipping match {sb_match.get('match_id')}: {exc}")
-        self.stdout.write(self.style.SUCCESS(f"Ingested {created} matches with xG."))
+                self.stderr.write(f"  skipping match {sb_match.get('match_id')}: {exc}")
+        self.stdout.write(f"  {created} matches")
+        return created
 
     def _get_league(self, sample, comp_id, season_id):
         comp_name = "StatsBomb Competition"
@@ -73,17 +109,24 @@ class Command(BaseCommand):
         )
         return league
 
-    def _team(self, team_obj, league):
+    def _team(self, team_id, team_name, league):
         team, _ = Team.objects.update_or_create(
             source=Source.FOOTBALL_DATA,
-            external_id=f"sb-{team_obj['team_id']}",
-            defaults={"name": team_obj["team_name"], "league": league},
+            external_id=f"sb-{team_id}",
+            defaults={"name": team_name, "league": league},
         )
         return team
 
     def _ingest_match(self, sb_match, league):
-        home = self._team(sb_match["home_team"], league)
-        away = self._team(sb_match["away_team"], league)
+        # StatsBomb matches.json prefixes keys: home_team_id / home_team_name etc.
+        home_obj = sb_match["home_team"]
+        away_obj = sb_match["away_team"]
+        home = self._team(
+            home_obj["home_team_id"], home_obj["home_team_name"], league
+        )
+        away = self._team(
+            away_obj["away_team_id"], away_obj["away_team_name"], league
+        )
         kickoff = datetime.fromisoformat(
             f"{sb_match['match_date']}T{sb_match.get('kick_off') or '00:00:00'}"
         ).replace(tzinfo=timezone.utc)
