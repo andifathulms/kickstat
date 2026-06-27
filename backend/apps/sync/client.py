@@ -8,13 +8,22 @@ from django.core.cache import cache
 
 from .models import SyncLog
 
-# football-data.org competition codes for the leagues we cover (PRD data sources).
+# football-data.org competition codes. All of these are in the free TIER_ONE plan,
+# so we sync the full set to collect as much data as possible (no daily cap; the
+# only cost is the 6s/request throttle). The first five are the PRD's core leagues.
 FOOTBALL_DATA_COMPETITIONS = {
     "PL": "Premier League",
     "PD": "La Liga",
     "SA": "Serie A",
     "BL1": "Bundesliga",
     "CL": "UEFA Champions League",
+    "FL1": "Ligue 1",
+    "DED": "Eredivisie",
+    "PPL": "Primeira Liga",
+    "ELC": "Championship",
+    "BSA": "Brazil Série A",
+    "WC": "FIFA World Cup",
+    "EC": "European Championship",
 }
 
 # API-Football league id for Indonesian Liga 1.
