@@ -1,0 +1,42 @@
+{% extends "admin/change_list.html" %}
+
+{% block content %}
+<div class="module" style="margin-bottom:20px;padding:12px 16px;">
+  <h2 style="margin-top:0;">Prediction accuracy by model version</h2>
+  {% if accuracy_report %}
+  <table style="width:100%;max-width:680px;">
+    <thead>
+      <tr>
+        <th style="text-align:left;">Model version</th>
+        <th style="text-align:right;">Predictions</th>
+        <th style="text-align:right;">Scored</th>
+        <th style="text-align:right;">Correct</th>
+        <th style="text-align:right;">Pending</th>
+        <th style="text-align:right;">Accuracy</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for row in accuracy_report %}
+      <tr>
+        <td><strong>{{ row.version }}</strong></td>
+        <td style="text-align:right;">{{ row.total }}</td>
+        <td style="text-align:right;">{{ row.scored }}</td>
+        <td style="text-align:right;">{{ row.correct }}</td>
+        <td style="text-align:right;">{{ row.pending }}</td>
+        <td style="text-align:right;">
+          {% if row.accuracy_pct is not None %}{{ row.accuracy_pct }}%{% else %}—{% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <p style="color:#777;margin-bottom:0;">
+    Accuracy counts only predictions whose match has finished and been scored.
+    Use the “Evaluate finished predictions” action to score new results.
+  </p>
+  {% else %}
+  <p>No predictions yet. Run <code>run_daily_predictions</code> to generate some.</p>
+  {% endif %}
+</div>
+{{ block.super }}
+{% endblock %}

@@ -1,4 +1,6 @@
-from django.contrib import admin
+from django.contrib import admin, messages
+
+from ml.evaluate import accuracy_report, evaluate_unscored
 
 from .models import MatchPrediction
 
@@ -18,3 +20,20 @@ class MatchPredictionAdmin(admin.ModelAdmin):
     list_filter = ("predicted_outcome", "model_version", "was_correct")
     search_fields = ("match__home_team__name", "match__away_team__name")
     autocomplete_fields = ("match",)
+    change_list_template = "admin/predictions/matchprediction/change_list.html"
+    actions = ["run_evaluation"]
+
+    def changelist_view(self, request, extra_context=None):
+        """Inject the per-model accuracy summary above the prediction list."""
+        extra_context = extra_context or {}
+        extra_context["accuracy_report"] = accuracy_report()
+        return super().changelist_view(request, extra_context=extra_context)
+
+    @admin.action(description="Evaluate finished predictions (fill accuracy)")
+    def run_evaluation(self, request, queryset):
+        scored, correct = evaluate_unscored()
+        self.message_user(
+            request,
+            f"Evaluated {scored} finished prediction(s); {correct} correct.",
+            level=messages.SUCCESS,
+        )

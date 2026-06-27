@@ -50,3 +50,35 @@ def accuracy_by_version():
         hits = qs.filter(was_correct=True).count()
         result[version] = round(hits / total, 4) if total else 0.0
     return result
+
+
+def accuracy_report():
+    """Per-version breakdown for the admin dashboard.
+
+    Returns a list of dicts ordered by accuracy desc:
+    {version, total, scored, correct, pending, accuracy_pct}
+    where ``pending`` counts predictions still awaiting a result.
+    """
+    rows = []
+    versions = (
+        MatchPrediction.objects.values_list("model_version", flat=True)
+        .distinct()
+        .order_by("model_version")
+    )
+    for version in versions:
+        qs = MatchPrediction.objects.filter(model_version=version)
+        total = qs.count()
+        scored = qs.filter(was_correct__isnull=False).count()
+        correct = qs.filter(was_correct=True).count()
+        rows.append(
+            {
+                "version": version,
+                "total": total,
+                "scored": scored,
+                "correct": correct,
+                "pending": total - scored,
+                "accuracy_pct": round(100 * correct / scored, 1) if scored else None,
+            }
+        )
+    rows.sort(key=lambda r: (r["accuracy_pct"] is not None, r["accuracy_pct"] or 0), reverse=True)
+    return rows
