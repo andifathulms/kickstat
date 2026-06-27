@@ -23,6 +23,26 @@ docker compose exec backend python manage.py initial_sync
 - API: http://localhost:8000/api/
 - Frontend: http://localhost:3000
 
+## Testing
+
+Backend tests run against sqlite + in-memory cache with Celery eager — no
+Postgres/Redis needed:
+
+```bash
+docker compose exec backend python manage.py test --settings=config.settings.test
+# or locally (Python 3.12 venv):
+DJANGO_SETTINGS_MODULE=config.settings.test python manage.py test
+```
+
+Covers sync API-response parsing (mocked HTTP), all DRF endpoints, and the
+ML train/predict/evaluate pipeline.
+
+Frontend:
+
+```bash
+cd frontend && npm run lint && npm run build
+```
+
 ## Layout
 
 ```
