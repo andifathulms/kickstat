@@ -102,8 +102,16 @@ REST_FRAMEWORK = {
     ],
 }
 
-# Celery
+# Cache (Redis) — used by API-Football daily quota counter
 REDIS_URL = os.getenv("REDIS_URL", "redis://redis:6379/0")
+CACHES = {
+    "default": {
+        "BACKEND": "django.core.cache.backends.redis.RedisCache",
+        "LOCATION": REDIS_URL,
+    }
+}
+
+# Celery
 CELERY_BROKER_URL = REDIS_URL
 CELERY_RESULT_BACKEND = REDIS_URL
 CELERY_TIMEZONE = "Asia/Jakarta"  # WIB — schedule times in PRD are WIB
