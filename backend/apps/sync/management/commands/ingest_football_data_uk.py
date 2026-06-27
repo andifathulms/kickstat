@@ -13,6 +13,7 @@ Data is stored as historical, non-live matches: one umbrella League per division
 """
 import csv
 import io
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -23,6 +24,35 @@ from apps.leagues.models import League, Source, Team
 from apps.matches.models import Match, MatchStats, MatchStatus
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281"
+
+# Be polite to the static file host and resilient to transient errors.
+REQUEST_DELAY_SECONDS = 0.5
+MAX_RETRIES = 3
+
+
+def fetch_csv(url):
+    """Download a CSV with retries. Returns text, or None if the file is absent.
+
+    404 means the division/season doesn't exist -> skip (no retry). Transient
+    failures (timeouts, SSL, 5xx, rate-limit) are retried with backoff.
+    """
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, timeout=60)
+        except requests.RequestException:
+            if attempt == MAX_RETRIES:
+                return None
+            time.sleep(attempt * 2)
+            continue
+        if resp.status_code == 404:
+            return None
+        if resp.status_code == 200:
+            return resp.content.decode("latin-1")
+        # 403/429/5xx -> back off and retry
+        if attempt == MAX_RETRIES:
+            return None
+        time.sleep(attempt * 2)
+    return None
 
 # football-data.co.uk division code -> (display name, country)
 DIVISIONS = {
@@ -124,13 +154,14 @@ class Command(BaseCommand):
     def _ingest_season(self, division, season, league):
         url = f"{BASE_URL}/{season}/{division}.csv"
         self.stdout.write(f"Fetching {url}")
-        resp = requests.get(url, timeout=60)
-        if resp.status_code != 200:
-            self.stderr.write(f"  skipped (HTTP {resp.status_code})")
+        text = fetch_csv(url)
+        time.sleep(REQUEST_DELAY_SECONDS)  # be polite across many sequential pulls
+        if text is None:
+            self.stderr.write("  skipped (unavailable)")
             return 0
 
         # football-data.co.uk CSVs are latin-1 and sometimes have trailing commas.
-        reader = csv.DictReader(io.StringIO(resp.content.decode("latin-1")))
+        reader = csv.DictReader(io.StringIO(text))
         count = 0
         for row in reader:
             if not row.get("HomeTeam") or not row.get("AwayTeam"):
