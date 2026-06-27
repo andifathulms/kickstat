@@ -27,6 +27,7 @@ INSTALLED_APPS = [
     "corsheaders",
     "django_celery_beat",
     # Local apps
+    "apps.common",
     "apps.leagues",
     "apps.matches",
     "apps.predictions",
