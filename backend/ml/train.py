@@ -2,8 +2,8 @@
 
 Run inside the Django environment, e.g.:
 
-    python manage.py train_model --version v1   # logistic regression (Phase 1)
-    python manage.py train_model --version v2   # XGBoost (Phase 2)
+    python manage.py train_model --variant v1   # logistic regression (Phase 1)
+    python manage.py train_model --variant v2   # XGBoost (Phase 2)
 
 Both build features from all FINISHED matches and serialize a model bundle to
 ml/models/<version>.pkl. The bundle records its ``feature_set`` so inference

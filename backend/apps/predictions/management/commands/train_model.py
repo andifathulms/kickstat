@@ -1,7 +1,7 @@
 """Train an outcome-prediction model.
 
-    python manage.py train_model --version v1   # logistic regression (Phase 1)
-    python manage.py train_model --version v2   # XGBoost (Phase 2)
+    python manage.py train_model --variant v1   # logistic regression (Phase 1)
+    python manage.py train_model --variant v2   # XGBoost (Phase 2)
 """
 from django.core.management.base import BaseCommand, CommandError
 
@@ -12,17 +12,18 @@ class Command(BaseCommand):
     help = "Train a prediction model and serialize it to ml/models/."
 
     def add_arguments(self, parser):
+        # NB: --version is reserved by Django's base command, so use --variant.
         parser.add_argument(
-            "--version",
+            "--variant",
             default="v2",
             choices=list(MODELS),
-            help="Model version to train (default: v2 / XGBoost).",
+            help="Model variant to train (default: v2 / XGBoost).",
         )
 
     def handle(self, *args, **options):
-        version = options["version"]
+        variant = options["variant"]
         try:
-            path = train(version)
+            path = train(variant)
         except RuntimeError as exc:
             raise CommandError(str(exc))
         self.stdout.write(self.style.SUCCESS(f"Model saved: {path}"))
