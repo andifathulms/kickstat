@@ -3,6 +3,7 @@ import type { MatchWithStats } from "@/lib/types";
 import { formatKickoffDate } from "@/lib/utils";
 import ScoreBig from "@/components/ui/ScoreBig";
 import MatchStatsInline from "@/components/match/MatchStatsInline";
+import MarketOdds from "@/components/match/MarketOdds";
 
 /** A finished historical match: teams, score, date, and the acquired stats. */
 export default function HistoryMatchRow({ match }: { match: MatchWithStats }) {
@@ -21,6 +22,7 @@ export default function HistoryMatchRow({ match }: { match: MatchWithStats }) {
         <span className="truncate">{match.away_team.name}</span>
       </div>
       <MatchStatsInline stats={match.stats} />
+      <MarketOdds odds={match.odds} compact />
     </Link>
   );
 }

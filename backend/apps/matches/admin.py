@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import Match, MatchEvent, MatchStats
+from .models import Match, MatchEvent, MatchOdds, MatchStats
 
 
 class MatchStatsInline(admin.StackedInline):
@@ -35,6 +35,13 @@ class MatchAdmin(admin.ModelAdmin):
 @admin.register(MatchStats)
 class MatchStatsAdmin(admin.ModelAdmin):
     list_display = ("match", "home_possession", "away_possession", "home_xg", "away_xg")
+    search_fields = ("match__home_team__name", "match__away_team__name")
+    autocomplete_fields = ("match",)
+
+
+@admin.register(MatchOdds)
+class MatchOddsAdmin(admin.ModelAdmin):
+    list_display = ("match", "home_odds", "draw_odds", "away_odds", "source")
     search_fields = ("match__home_team__name", "match__away_team__name")
     autocomplete_fields = ("match",)
 

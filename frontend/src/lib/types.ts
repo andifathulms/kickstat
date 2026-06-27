@@ -104,12 +104,30 @@ export interface MatchListItem {
 export interface MatchDetail extends Omit<MatchListItem, "league"> {
   league: League;
   stats: MatchStats | null;
+  odds: MatchOdds | null;
   events: MatchEvent[];
   prediction: Prediction | null;
 }
 
+export interface ImpliedProbabilities {
+  home: number;
+  draw: number;
+  away: number;
+}
+
+export interface MatchOdds {
+  home_odds: number | null;
+  draw_odds: number | null;
+  away_odds: number | null;
+  over25_odds: number | null;
+  under25_odds: number | null;
+  source: string;
+  implied_probabilities: ImpliedProbabilities | null;
+}
+
 export interface MatchWithStats extends MatchListItem {
   stats: MatchStats | null;
+  odds: MatchOdds | null;
 }
 
 export interface ArchiveLeague {

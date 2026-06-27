@@ -2,13 +2,32 @@ from rest_framework import serializers
 
 from apps.leagues.serializers import LeagueSerializer, TeamMiniSerializer
 
-from .models import Match, MatchEvent, MatchStats
+from .models import Match, MatchEvent, MatchOdds, MatchStats
 
 
 class MatchStatsSerializer(serializers.ModelSerializer):
     class Meta:
         model = MatchStats
         exclude = ("match", "created_at", "updated_at")
+
+
+class MatchOddsSerializer(serializers.ModelSerializer):
+    implied_probabilities = serializers.SerializerMethodField()
+
+    class Meta:
+        model = MatchOdds
+        fields = (
+            "home_odds",
+            "draw_odds",
+            "away_odds",
+            "over25_odds",
+            "under25_odds",
+            "source",
+            "implied_probabilities",
+        )
+
+    def get_implied_probabilities(self, obj):
+        return obj.implied_probabilities
 
 
 class MatchEventSerializer(serializers.ModelSerializer):
@@ -46,19 +65,21 @@ class MatchListSerializer(serializers.ModelSerializer):
 
 
 class MatchListWithStatsSerializer(MatchListSerializer):
-    """Compact match payload plus nested stats — for the history/archive list."""
+    """Compact match payload plus nested stats + odds — for the history/archive list."""
 
     stats = MatchStatsSerializer(read_only=True)
+    odds = MatchOddsSerializer(read_only=True)
 
     class Meta(MatchListSerializer.Meta):
-        fields = MatchListSerializer.Meta.fields + ("stats",)
+        fields = MatchListSerializer.Meta.fields + ("stats", "odds")
 
 
 class MatchDetailSerializer(MatchListSerializer):
-    """Full match payload: nested league, stats, events, prediction."""
+    """Full match payload: nested league, stats, events, odds, prediction."""
 
     league = LeagueSerializer(read_only=True)
     stats = MatchStatsSerializer(read_only=True)
+    odds = MatchOddsSerializer(read_only=True)
     events = MatchEventSerializer(many=True, read_only=True)
     prediction = serializers.SerializerMethodField()
 
@@ -76,6 +97,7 @@ class MatchDetailSerializer(MatchListSerializer):
             "home_score",
             "away_score",
             "stats",
+            "odds",
             "events",
             "prediction",
         )

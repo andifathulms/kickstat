@@ -27,11 +27,11 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
             "league", "home_team", "away_team"
         )
         if self.action == "retrieve":
-            qs = qs.select_related("stats").prefetch_related(
+            qs = qs.select_related("stats", "odds").prefetch_related(
                 "events__team", "events__player", "prediction"
             )
         elif self._wants_stats():
-            qs = qs.select_related("stats")
+            qs = qs.select_related("stats", "odds")
         return qs.order_by("kickoff")
 
     def get_serializer_class(self):

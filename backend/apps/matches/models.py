@@ -71,6 +71,41 @@ class MatchStats(BaseModel):
         return f"Stats: {self.match}"
 
 
+class MatchOdds(BaseModel):
+    """Pre-match bookmaker odds (decimal). Sourced from football-data.co.uk CSVs,
+    which already ship in each match's raw_data. Market-implied probabilities are
+    derived (de-vigged) on the fly."""
+
+    match = models.OneToOneField(
+        Match, related_name="odds", on_delete=models.CASCADE
+    )
+    home_odds = models.FloatField(null=True, blank=True)
+    draw_odds = models.FloatField(null=True, blank=True)
+    away_odds = models.FloatField(null=True, blank=True)
+    over25_odds = models.FloatField(null=True, blank=True)
+    under25_odds = models.FloatField(null=True, blank=True)
+    source = models.CharField(max_length=40, default="football-data.co.uk")
+
+    class Meta:
+        verbose_name_plural = "Match odds"
+
+    def __str__(self):
+        return f"Odds: {self.match}"
+
+    @property
+    def implied_probabilities(self):
+        """De-vigged home/draw/away probabilities from the 1X2 odds, or None."""
+        if not (self.home_odds and self.draw_odds and self.away_odds):
+            return None
+        raw = [1 / self.home_odds, 1 / self.draw_odds, 1 / self.away_odds]
+        total = sum(raw)
+        return {
+            "home": round(raw[0] / total, 4),
+            "draw": round(raw[1] / total, 4),
+            "away": round(raw[2] / total, 4),
+        }
+
+
 class EventType(models.TextChoices):
     GOAL = "GOAL", "Goal"
     YELLOW = "YELLOW", "Yellow card"
