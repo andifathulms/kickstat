@@ -6,6 +6,7 @@ Pulls match metadata and per-match shot events from the public StatsBomb
 open-data GitHub repo, aggregates shot xG per team, and upserts League / Team /
 Match / MatchStats rows. This is training data only — not used for live display.
 """
+import time
 from datetime import datetime, timezone
 
 import requests
@@ -16,11 +17,24 @@ from apps.matches.models import Match, MatchStats, MatchStatus
 
 RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
+MAX_RETRIES = 4
+
 
 def _get(url):
-    resp = requests.get(url, timeout=60)
-    resp.raise_for_status()
-    return resp.json()
+    """GET JSON with retries on transient network errors (timeouts, 5xx, reset)."""
+    last_exc = None
+    for attempt in range(1, MAX_RETRIES + 1):
+        try:
+            resp = requests.get(url, timeout=60)
+            resp.raise_for_status()
+            return resp.json()
+        except requests.HTTPError:
+            raise  # 404 etc. — a real "not found", let the caller decide
+        except requests.RequestException as exc:  # timeout / connection reset
+            last_exc = exc
+            if attempt < MAX_RETRIES:
+                time.sleep(attempt * 3)
+    raise last_exc
 
 
 class Command(BaseCommand):
@@ -84,7 +98,8 @@ class Command(BaseCommand):
         for sb_match in matches:
             try:
                 created += self._ingest_match(sb_match, league)
-            except requests.HTTPError as exc:
+            except requests.RequestException as exc:
+                # Don't let one unreachable events file abort the whole run.
                 self.stderr.write(f"  skipping match {sb_match.get('match_id')}: {exc}")
         self.stdout.write(f"  {created} matches")
         return created
@@ -118,6 +133,14 @@ class Command(BaseCommand):
         return team
 
     def _ingest_match(self, sb_match, league):
+        # Resumable: skip matches already ingested with xG (avoids re-downloading
+        # the large events file on a re-run after a network failure).
+        ext = f"sb-{sb_match['match_id']}"
+        if MatchStats.objects.filter(
+            match__external_id=ext, home_xg__isnull=False
+        ).exists():
+            return 0
+
         # StatsBomb matches.json prefixes keys: home_team_id / home_team_name etc.
         home_obj = sb_match["home_team"]
         away_obj = sb_match["away_team"]
