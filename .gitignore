@@ -1,0 +1,43 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+*.egg
+.venv/
+venv/
+env/
+*.sqlite3
+*.log
+
+# Django
+/backend/staticfiles/
+/backend/media/
+celerybeat-schedule
+celerybeat.pid
+
+# ML models (large binaries — keep dir, ignore pickles)
+/backend/ml/models/*.pkl
+
+# Node / Next.js
+node_modules/
+/frontend/.next/
+/frontend/out/
+/frontend/build/
+.npm
+*.tsbuildinfo
+next-env.d.ts
+
+# Env
+.env
+.env.local
+*.local
+
+# Editor / OS
+.DS_Store
+.idea/
+.vscode/
+*.swp
+
+# Docker
+.docker/
