@@ -18,6 +18,34 @@ const COLS: {
   { key: "points", label: "Pts", em: true },
 ];
 
+const FORM_STYLE: Record<string, string> = {
+  W: "bg-grass-green/20 text-grass-green",
+  D: "bg-amber-goal/20 text-amber-goal",
+  L: "bg-red-card/20 text-red-card",
+};
+
+function Form({ form }: { form?: ("W" | "D" | "L")[] }) {
+  if (!form || form.length === 0) {
+    return <span className="text-text-muted">–</span>;
+  }
+  return (
+    <div className="flex justify-end gap-0.5">
+      {form.map((r, i) => (
+        <span
+          key={i}
+          className={cn(
+            "grid h-4 w-4 place-items-center rounded-[3px] text-[9px] font-bold",
+            FORM_STYLE[r]
+          )}
+          title={r}
+        >
+          {r}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 /** Accent stripe on the position cell to hint at zones (top / relegation). */
 function zoneClass(position: number, total: number): string {
   if (position <= 4) return "before:bg-grass-green"; // CL-ish
@@ -56,6 +84,9 @@ export default function StandingsTable({
                 <span className="stat-label">{c.label}</span>
               </th>
             ))}
+            <th className="hidden w-28 py-3 pl-2 pr-4 text-right md:table-cell">
+              <span className="stat-label">Form</span>
+            </th>
           </tr>
         </thead>
         <tbody>
@@ -107,6 +138,9 @@ export default function StandingsTable({
                     : String(s[c.key])}
                 </td>
               ))}
+              <td className="hidden py-2.5 pl-2 pr-4 md:table-cell">
+                <Form form={s.form} />
+              </td>
             </tr>
           ))}
         </tbody>

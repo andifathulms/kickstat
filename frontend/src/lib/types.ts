@@ -44,6 +44,8 @@ export interface Standing {
   goals_against: number;
   goal_difference: number;
   points: number;
+  /** last-5 results, chronological (oldest → newest) */
+  form?: ("W" | "D" | "L")[];
   /** true when derived from match results rather than synced from a source */
   computed?: boolean;
 }

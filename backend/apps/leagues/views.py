@@ -33,6 +33,35 @@ def _season_bounds(year: int) -> tuple[datetime.date, datetime.date]:
     return datetime.date(year, 8, 1), datetime.date(year + 1, 7, 31)
 
 
+def _season_form(
+    league: League, date_from, date_to, venue: str = "overall", last: int = 5
+) -> dict[int, list[str]]:
+    """Recent W/D/L sequence per team (chronological, latest last)."""
+    matches = (
+        Match.objects.filter(
+            league=league,
+            status=MatchStatus.FINISHED,
+            kickoff__date__gte=date_from,
+            kickoff__date__lte=date_to,
+            home_score__isnull=False,
+            away_score__isnull=False,
+        )
+        .order_by("kickoff")
+        .values_list("home_team_id", "away_team_id", "home_score", "away_score")
+    )
+
+    def outcome(gf, ga):
+        return "W" if gf > ga else ("L" if gf < ga else "D")
+
+    seq: dict[int, list[str]] = {}
+    for home_id, away_id, hs, as_ in matches:
+        if venue in ("overall", "home"):
+            seq.setdefault(home_id, []).append(outcome(hs, as_))
+        if venue in ("overall", "away"):
+            seq.setdefault(away_id, []).append(outcome(as_, hs))
+    return {tid: results[-last:] for tid, results in seq.items()}
+
+
 def _compute_standings(
     league: League, season: str, date_from, date_to, venue: str = "overall"
 ) -> list[dict]:
@@ -87,6 +116,8 @@ def _compute_standings(
         if venue in ("overall", "away"):
             credit(m.away_team, as_, hs)
 
+    form = _season_form(league, date_from, date_to, venue)
+
     rows = list(table.values())
     for r in rows:
         r["goal_difference"] = r["goals_for"] - r["goals_against"]
@@ -118,6 +149,7 @@ def _compute_standings(
             "goals_against": r["goals_against"],
             "goal_difference": r["goal_difference"],
             "points": r["points"],
+            "form": form.get(r["team"].id, []),
             "computed": True,
         }
         for i, r in enumerate(rows, start=1)
@@ -206,7 +238,16 @@ class LeagueViewSet(viewsets.ReadOnlyModelViewSet):
                     .order_by("position")
                 )
                 if stored and any(s.played > 0 for s in stored):
-                    return Response(StandingSerializer(stored, many=True).data)
+                    try:
+                        year = int(season)
+                        df, dt = _season_bounds(year)
+                        form = _season_form(league, df, dt, venue)
+                    except ValueError:
+                        form = {}
+                    data = StandingSerializer(stored, many=True).data
+                    for row in data:
+                        row["form"] = form.get(row["team"]["id"], [])
+                    return Response(data)
             try:
                 year = int(season)
             except ValueError:
