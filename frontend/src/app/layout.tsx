@@ -1,7 +1,9 @@
 import type { Metadata } from "next";
 import { Inter, DM_Mono } from "next/font/google";
-import Link from "next/link";
 import "@/styles/globals.css";
+import { getLeagues } from "@/lib/api";
+import { groupLeagues } from "@/lib/competitions";
+import SiteHeader from "@/components/layout/SiteHeader";
 
 const inter = Inter({ subsets: ["latin"], variable: "--font-inter" });
 const dmMono = DM_Mono({
@@ -16,46 +18,34 @@ export const metadata: Metadata = {
     "Live scores, match stats, league standings, and AI predictions for Europe's top leagues and Indonesian Liga 1.",
 };
 
-const NAV = [
-  { href: "/", label: "Home" },
-  { href: "/standings", label: "Standings" },
-  { href: "/predictions", label: "Predictions" },
-  { href: "/history", label: "History" },
-];
-
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const leagues = await getLeagues().catch(() => ({
+    count: 0,
+    next: null,
+    previous: null,
+    results: [],
+  }));
+  const groups = groupLeagues(leagues.results.filter((l) => l.is_active));
+
   return (
     <html lang="en" className={`${inter.variable} ${dmMono.variable}`}>
       <body>
-        <header className="border-b border-border bg-surface/80 backdrop-blur sticky top-0 z-50">
-          <div className="mx-auto max-w-6xl px-4 h-14 flex items-center justify-between">
-            <Link href="/" className="flex items-center gap-2">
-              <span className="h-2.5 w-2.5 rounded-full bg-grass-green" />
-              <span className="font-mono text-lg font-medium tracking-tight">
-                kickstat
-              </span>
-            </Link>
-            <nav className="flex items-center gap-6 text-sm text-text-secondary">
-              {NAV.map((item) => (
-                <Link
-                  key={item.href}
-                  href={item.href}
-                  className="hover:text-text-primary transition-colors"
-                >
-                  {item.label}
-                </Link>
-              ))}
-            </nav>
+        <SiteHeader groups={groups} />
+        <main className="mx-auto max-w-7xl px-4 py-8">{children}</main>
+        <footer className="border-t border-border/60">
+          <div className="mx-auto flex max-w-7xl flex-col gap-2 px-4 py-8 text-xs text-text-muted sm:flex-row sm:items-center sm:justify-between">
+            <span>
+              <span className="font-mono text-text-secondary">kickstat</span> —
+              a football analytics demo.
+            </span>
+            <span>
+              Data from football-data.org, API-Football &amp; StatsBomb.
+            </span>
           </div>
-        </header>
-        <main className="mx-auto max-w-6xl px-4 py-6">{children}</main>
-        <footer className="mx-auto max-w-6xl px-4 py-10 text-xs text-text-secondary">
-          Data from football-data.org, API-Football & StatsBomb. Kickstat is a
-          demo analytics project.
         </footer>
       </body>
     </html>
