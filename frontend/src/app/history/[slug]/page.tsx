@@ -51,12 +51,18 @@ export default async function HistoryLeaguePage({
 
   return (
     <div className="space-y-5">
-      <header>
-        <Link href="/history" className="text-sm text-text-secondary hover:text-grass-green">
-          ← Archive
+      <nav className="flex items-center gap-2 text-xs text-text-secondary">
+        <Link href="/history" className="hover:text-accent">
+          Archive
         </Link>
-        <h1 className="text-2xl font-semibold mt-1">{league.name}</h1>
-        <p className="text-text-secondary text-sm">
+        <span className="text-text-muted">/</span>
+        <span className="text-text-primary">{league.name}</span>
+      </nav>
+      <header>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          {league.name}
+        </h1>
+        <p className="text-sm text-text-secondary">
           {league.country} · {data.count.toLocaleString()} matches
           {season ? ` · ${season}/${(season + 1).toString().slice(2)}` : ""}
         </p>
@@ -117,10 +123,8 @@ function Chip({
     <Link
       href={href}
       className={cn(
-        "px-3 py-1.5 rounded-lg text-sm whitespace-nowrap transition-colors",
-        active
-          ? "bg-surface-raised text-text-primary"
-          : "text-text-secondary hover:text-text-primary"
+        "pill text-xs",
+        active ? "pill-active" : "pill-idle"
       )}
     >
       {children}
@@ -141,7 +145,7 @@ function PageLink({
     return <span className="text-sm text-text-secondary/40">{children}</span>;
   }
   return (
-    <Link href={href} className="text-sm text-text-primary hover:text-grass-green">
+    <Link href={href} className="text-sm text-text-primary hover:text-accent">
       {children}
     </Link>
   );

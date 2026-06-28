@@ -7,8 +7,8 @@ import StandingsBoard, {
 export const revalidate = 120;
 
 export const metadata: Metadata = {
-  title: "Standings — Kickstat",
-  description: "League standings at a glance across all covered competitions.",
+  title: "Competitions — Kickstat",
+  description: "League standings by competition and season across all leagues.",
 };
 
 export default async function StandingsPage() {
@@ -29,7 +29,15 @@ export default async function StandingsPage() {
 
   return (
     <div className="space-y-6">
-      <h1 className="text-2xl font-semibold">Standings</h1>
+      <header>
+        <span className="stat-label text-accent/90">Competitions</span>
+        <h1 className="mt-1 text-2xl font-semibold tracking-tight">
+          Standings
+        </h1>
+        <p className="mt-1 text-sm text-text-secondary">
+          Pick a competition, switch seasons, and read the table.
+        </p>
+      </header>
       <StandingsBoard data={data} />
     </div>
   );
