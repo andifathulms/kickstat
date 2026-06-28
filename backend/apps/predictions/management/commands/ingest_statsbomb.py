@@ -37,6 +37,84 @@ def _get(url):
     raise last_exc
 
 
+# StatsBomb shot outcomes that count as on-target.
+_ON_TARGET = {"Goal", "Saved", "Saved to Post"}
+
+
+def _apply_card(side, name):
+    if name == "Yellow Card":
+        side["yellow"] += 1
+    elif name == "Second Yellow":
+        side["yellow"] += 1
+        side["red"] += 1
+    elif name == "Red Card":
+        side["red"] += 1
+
+
+def compute_match_stats(events, home_name, away_name):
+    """Derive a full per-team stat line from a StatsBomb events list.
+
+    Returns a dict of MatchStats field values: shots, shots-on-target, corners,
+    fouls, yellow/red cards, xG, and possession (passes-share proxy). Pure — no
+    DB or network — so it is unit-tested directly.
+    """
+    side_of = {home_name: "home", away_name: "away"}
+    agg = {
+        s: {"shots": 0, "sot": 0, "corners": 0, "fouls": 0,
+            "yellow": 0, "red": 0, "passes": 0, "xg": 0.0}
+        for s in ("home", "away")
+    }
+    for e in events:
+        side = side_of.get((e.get("team") or {}).get("name"))
+        if side is None:
+            continue
+        a = agg[side]
+        etype = (e.get("type") or {}).get("name")
+        if etype == "Shot":
+            shot = e.get("shot") or {}
+            a["shots"] += 1
+            a["xg"] += shot.get("statsbomb_xg") or 0.0
+            if (shot.get("outcome") or {}).get("name") in _ON_TARGET:
+                a["sot"] += 1
+        elif etype == "Pass":
+            a["passes"] += 1
+            if ((e.get("pass") or {}).get("type") or {}).get("name") == "Corner":
+                a["corners"] += 1
+        elif etype == "Foul Committed":
+            a["fouls"] += 1
+            _apply_card(a, ((e.get("foul_committed") or {}).get("card") or {}).get("name"))
+        elif etype == "Bad Behaviour":
+            _apply_card(a, ((e.get("bad_behaviour") or {}).get("card") or {}).get("name"))
+
+    total_passes = agg["home"]["passes"] + agg["away"]["passes"]
+
+    def possession(side):
+        return (
+            round(100 * agg[side]["passes"] / total_passes, 1)
+            if total_passes
+            else None
+        )
+
+    return {
+        "home_shots": agg["home"]["shots"],
+        "away_shots": agg["away"]["shots"],
+        "home_shots_on_target": agg["home"]["sot"],
+        "away_shots_on_target": agg["away"]["sot"],
+        "home_corners": agg["home"]["corners"],
+        "away_corners": agg["away"]["corners"],
+        "home_fouls": agg["home"]["fouls"],
+        "away_fouls": agg["away"]["fouls"],
+        "home_yellow_cards": agg["home"]["yellow"],
+        "away_yellow_cards": agg["away"]["yellow"],
+        "home_red_cards": agg["home"]["red"],
+        "away_red_cards": agg["away"]["red"],
+        "home_xg": round(agg["home"]["xg"], 3),
+        "away_xg": round(agg["away"]["xg"], 3),
+        "home_possession": possession("home"),
+        "away_possession": possession("away"),
+    }
+
+
 class Command(BaseCommand):
     help = "Ingest StatsBomb open data (matches + xG) for a competition/season."
 
@@ -133,11 +211,12 @@ class Command(BaseCommand):
         return team
 
     def _ingest_match(self, sb_match, league):
-        # Resumable: skip matches already ingested with xG (avoids re-downloading
-        # the large events file on a re-run after a network failure).
+        # Resumable: skip matches that already have the full stat line (we mark
+        # completeness by possession, which only the enriched path sets). Older
+        # xG-only rows are reprocessed once to backfill the richer stats.
         ext = f"sb-{sb_match['match_id']}"
         if MatchStats.objects.filter(
-            match__external_id=ext, home_xg__isnull=False
+            match__external_id=ext, home_possession__isnull=False
         ).exists():
             return 0
 
@@ -168,23 +247,7 @@ class Command(BaseCommand):
             },
         )
 
-        home_xg, away_xg = self._aggregate_xg(sb_match["match_id"], home, away)
-        MatchStats.objects.update_or_create(
-            match=match,
-            defaults={"home_xg": round(home_xg, 3), "away_xg": round(away_xg, 3)},
-        )
+        events = _get(f"{RAW_BASE}/events/{sb_match['match_id']}.json")
+        stats = compute_match_stats(events, home.name, away.name)
+        MatchStats.objects.update_or_create(match=match, defaults=stats)
         return 1
-
-    def _aggregate_xg(self, match_id, home, away):
-        events = _get(f"{RAW_BASE}/events/{match_id}.json")
-        home_xg = away_xg = 0.0
-        for event in events:
-            if event.get("type", {}).get("name") != "Shot":
-                continue
-            xg = event.get("shot", {}).get("statsbomb_xg", 0.0)
-            team_name = event.get("team", {}).get("name")
-            if team_name == home.name:
-                home_xg += xg
-            elif team_name == away.name:
-                away_xg += xg
-        return home_xg, away_xg
