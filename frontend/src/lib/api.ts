@@ -1,6 +1,7 @@
 import type {
   ArchiveLeague,
   League,
+  LeagueSeason,
   MatchDetail,
   MatchListItem,
   MatchWithStats,
@@ -39,8 +40,12 @@ export const getLeagues = () =>
   get<Paginated<League>>("/leagues/?is_active=true");
 export const getLeague = (idOrSlug: string | number) =>
   get<League>(`/leagues/${idOrSlug}/`);
-export const getStandings = (idOrSlug: string | number) =>
-  get<Standing[]>(`/leagues/${idOrSlug}/standings/`);
+export const getStandings = (idOrSlug: string | number, season?: string) =>
+  get<Standing[]>(
+    `/leagues/${idOrSlug}/standings/${season ? `?season=${season}` : ""}`
+  );
+export const getLeagueSeasons = (idOrSlug: string | number) =>
+  get<LeagueSeason[]>(`/leagues/${idOrSlug}/seasons/`, { revalidate: 600 });
 export const getLeagueFixtures = (idOrSlug: string | number) =>
   get<Paginated<MatchListItem>>(`/leagues/${idOrSlug}/fixtures/`);
 export const getLeagueResults = (idOrSlug: string | number) =>

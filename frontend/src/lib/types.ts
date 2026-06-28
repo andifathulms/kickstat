@@ -44,6 +44,13 @@ export interface Standing {
   goals_against: number;
   goal_difference: number;
   points: number;
+  /** true when derived from match results rather than synced from a source */
+  computed?: boolean;
+}
+
+export interface LeagueSeason {
+  season: string;
+  match_count: number;
 }
 
 export interface MatchStats {

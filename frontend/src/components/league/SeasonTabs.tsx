@@ -24,25 +24,21 @@ export default function SeasonTabs({
         {seasons.map((s) => (
           <Link
             key={s.value}
-            href={
-              s.isCurrent
-                ? `/league/${slug}`
-                : `/league/${slug}?season=${s.value}`
-            }
+            href={`/league/${slug}?season=${s.value}`}
             scroll={false}
             className={cn(
               "pill font-mono text-xs",
               s.value === active ? "pill-active" : "pill-idle"
             )}
+            title={s.isLive ? "Live season" : `${s.matchCount} matches`}
           >
             {s.label}
-            {s.isCurrent && (
+            {s.isLive && (
               <span
                 className={cn(
                   "ml-1 h-1.5 w-1.5 rounded-full",
                   s.value === active ? "bg-accent-ink" : "bg-grass-green"
                 )}
-                title="Current season"
               />
             )}
           </Link>

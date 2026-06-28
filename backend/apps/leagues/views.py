@@ -1,4 +1,7 @@
+import datetime
+
 from django.db.models import Count, Max, Min, Q
+from django.db.models.functions import ExtractMonth, ExtractYear
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -12,6 +15,98 @@ from .serializers import (
     StandingSerializer,
     TeamSerializer,
 )
+
+
+def _season_bounds(year: int) -> tuple[datetime.date, datetime.date]:
+    """UTC date window for a football season starting in `year` (Jul–Jun)."""
+    return datetime.date(year, 7, 1), datetime.date(year + 1, 6, 30)
+
+
+def _compute_standings(league: League, season: str, date_from, date_to) -> list[dict]:
+    """Derive a league table from finished matches in a date window."""
+    matches = Match.objects.filter(
+        league=league,
+        status=MatchStatus.FINISHED,
+        kickoff__date__gte=date_from,
+        kickoff__date__lte=date_to,
+        home_score__isnull=False,
+        away_score__isnull=False,
+    ).select_related("home_team", "away_team")
+
+    table: dict[int, dict] = {}
+
+    def row(team):
+        if team.id not in table:
+            table[team.id] = {
+                "team": team,
+                "played": 0,
+                "won": 0,
+                "drawn": 0,
+                "lost": 0,
+                "goals_for": 0,
+                "goals_against": 0,
+                "points": 0,
+            }
+        return table[team.id]
+
+    for m in matches:
+        home, away = row(m.home_team), row(m.away_team)
+        hs, as_ = m.home_score, m.away_score
+        home["played"] += 1
+        away["played"] += 1
+        home["goals_for"] += hs
+        home["goals_against"] += as_
+        away["goals_for"] += as_
+        away["goals_against"] += hs
+        if hs > as_:
+            home["won"] += 1
+            home["points"] += 3
+            away["lost"] += 1
+        elif hs < as_:
+            away["won"] += 1
+            away["points"] += 3
+            home["lost"] += 1
+        else:
+            home["drawn"] += 1
+            away["drawn"] += 1
+            home["points"] += 1
+            away["points"] += 1
+
+    rows = list(table.values())
+    for r in rows:
+        r["goal_difference"] = r["goals_for"] - r["goals_against"]
+    rows.sort(
+        key=lambda r: (
+            -r["points"],
+            -r["goal_difference"],
+            -r["goals_for"],
+            r["team"].name,
+        )
+    )
+
+    return [
+        {
+            "id": r["team"].id,  # synthetic; unique within this table
+            "season": season,
+            "position": i,
+            "team": {
+                "id": r["team"].id,
+                "name": r["team"].name,
+                "short_name": r["team"].short_name,
+                "logo_url": r["team"].logo_url,
+            },
+            "played": r["played"],
+            "won": r["won"],
+            "drawn": r["drawn"],
+            "lost": r["lost"],
+            "goals_for": r["goals_for"],
+            "goals_against": r["goals_against"],
+            "goal_difference": r["goal_difference"],
+            "points": r["points"],
+            "computed": True,
+        }
+        for i, r in enumerate(rows, start=1)
+    ]
 
 
 class LeagueViewSet(viewsets.ReadOnlyModelViewSet):
@@ -55,8 +150,51 @@ class LeagueViewSet(viewsets.ReadOnlyModelViewSet):
         return Response(data)
 
     @action(detail=True)
+    def seasons(self, request, pk=None):
+        """Seasons that actually have matches (Jul–Jun), newest first.
+
+        Avoids surfacing empty placeholder seasons — the table is derived from
+        real fixtures, not from a possibly-stale stored standings row.
+        """
+        league = self.get_object()
+        grouped = (
+            Match.objects.filter(league=league)
+            .annotate(y=ExtractYear("kickoff"), mo=ExtractMonth("kickoff"))
+            .values("y", "mo")
+            .annotate(c=Count("id"))
+        )
+        counts: dict[int, int] = {}
+        for g in grouped:
+            season = g["y"] if g["mo"] >= 7 else g["y"] - 1
+            counts[season] = counts.get(season, 0) + g["c"]
+        data = [
+            {"season": str(s), "match_count": counts[s]}
+            for s in sorted(counts, reverse=True)
+        ]
+        return Response(data)
+
+    @action(detail=True)
     def standings(self, request, pk=None):
         league = self.get_object()
+        season = request.query_params.get("season")
+
+        if season:
+            stored = list(
+                Standing.objects.filter(league=league, season=season)
+                .select_related("team")
+                .order_by("position")
+            )
+            # Use stored rows only when they carry real data (a live/synced
+            # table); otherwise compute the table from that season's matches.
+            if stored and any(s.played > 0 for s in stored):
+                return Response(StandingSerializer(stored, many=True).data)
+            try:
+                year = int(season)
+            except ValueError:
+                return Response([])
+            date_from, date_to = _season_bounds(year)
+            return Response(_compute_standings(league, season, date_from, date_to))
+
         qs = (
             Standing.objects.filter(league=league)
             .select_related("team")

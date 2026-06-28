@@ -1,4 +1,4 @@
-import type { ArchiveLeague, League, Standing } from "./types";
+import type { ArchiveLeague, League, LeagueSeason, Standing } from "./types";
 
 /**
  * Competition segmentation. The backend stores leagues as a flat list with a
@@ -190,40 +190,51 @@ export interface SeasonOption {
   /** season-start year as a string, e.g. "2024" */
   value: string;
   label: string;
-  isCurrent: boolean;
+  /** belongs to the live/active competition (vs the historical archive) */
+  isLive: boolean;
+  /** which league row holds this season's data */
+  leagueId: number;
+  matchCount: number;
 }
 
 /**
- * Build the season list for a competition page: the active current season
- * (standings + live fixtures) followed by archived seasons (matches only),
- * newest first.
+ * Merge the real seasons (those that actually have matches) of the active
+ * competition and its archived `(history)` counterpart into one list, newest
+ * first. Live seasons win over archived ones for the same year.
  */
-export function leagueSeasonOptions(
-  currentSeason: string,
-  history: ArchiveLeague | null
+export function buildSeasonOptions(
+  active: League,
+  activeSeasons: LeagueSeason[],
+  history: ArchiveLeague | null,
+  historySeasons: LeagueSeason[]
 ): SeasonOption[] {
-  const out: SeasonOption[] = [];
-  const seen = new Set<string>();
+  const byValue = new Map<string, SeasonOption>();
 
-  if (currentSeason) {
-    out.push({
-      value: currentSeason,
-      label: seasonLabel(currentSeason),
-      isCurrent: true,
+  for (const s of activeSeasons) {
+    byValue.set(s.season, {
+      value: s.season,
+      label: seasonLabel(s.season),
+      isLive: true,
+      leagueId: active.id,
+      matchCount: s.match_count,
     });
-    seen.add(currentSeason);
   }
-
-  if (history?.first_year && history?.last_year) {
-    for (let y = history.last_year; y >= history.first_year; y--) {
-      const v = String(y);
-      if (seen.has(v)) continue;
-      out.push({ value: v, label: seasonLabel(v), isCurrent: false });
-      seen.add(v);
+  if (history) {
+    for (const s of historySeasons) {
+      if (byValue.has(s.season)) continue;
+      byValue.set(s.season, {
+        value: s.season,
+        label: seasonLabel(s.season),
+        isLive: false,
+        leagueId: history.id,
+        matchCount: s.match_count,
+      });
     }
   }
 
-  return out;
+  return Array.from(byValue.values()).sort((a, b) =>
+    b.value.localeCompare(a.value)
+  );
 }
 
 /** UTC date range (ISO yyyy-mm-dd) covering a single football season. */

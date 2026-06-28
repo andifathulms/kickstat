@@ -6,16 +6,17 @@ import {
   getLeague,
   getLeagueFixtures,
   getLeagueResults,
+  getLeagueSeasons,
   getStandings,
 } from "@/lib/api";
 import {
   COMPETITION_GROUPS,
   competitionGroupOf,
   findHistoryLeague,
-  leagueSeasonOptions,
+  buildSeasonOptions,
   seasonDateRange,
   seasonLabel,
-  standingsForSeason,
+  type SeasonOption,
 } from "@/lib/competitions";
 import StandingsTable from "@/components/league/StandingsTable";
 import SeasonTabs from "@/components/league/SeasonTabs";
@@ -44,16 +45,25 @@ export default async function LeaguePage({
 
   const archive = await getArchiveLeagues().catch(() => []);
   const history = findHistoryLeague(league, archive);
-  const seasons = leagueSeasonOptions(league.season, history);
+
+  const [activeSeasons, historySeasons] = await Promise.all([
+    getLeagueSeasons(league.id).catch(() => []),
+    history ? getLeagueSeasons(history.id).catch(() => []) : Promise.resolve([]),
+  ]);
+
+  const seasons = buildSeasonOptions(
+    league,
+    activeSeasons,
+    history,
+    historySeasons
+  );
 
   const requested = searchParams.season;
   const selected =
-    requested && seasons.some((s) => s.value === requested)
-      ? requested
-      : league.season;
-  const isCurrent = selected === league.season;
+    seasons.find((s) => s.value === requested) ?? seasons[0] ?? null;
 
   const group = COMPETITION_GROUPS[competitionGroupOf(league)];
+  const page = Math.max(1, Number(searchParams.page) || 1);
 
   return (
     <div className="space-y-8">
@@ -73,41 +83,43 @@ export default async function LeaguePage({
       {/* Header */}
       <header className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6">
         <div className="pointer-events-none absolute inset-0 bg-accent-sheen opacity-60" />
-        <div className="relative flex flex-wrap items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
-            <CompetitionBadge
-              name={league.name}
-              className="h-12 w-12 text-base"
-            />
-            <div>
-              <span className="stat-label text-accent/90">{group.label}</span>
-              <h1 className="text-2xl font-semibold tracking-tight">
-                {league.name}
-              </h1>
-              <p className="text-sm text-text-secondary">
-                {league.country} · {seasonLabel(selected)} season
-              </p>
-            </div>
+        <div className="relative flex flex-wrap items-center gap-4">
+          <CompetitionBadge name={league.name} className="h-12 w-12 text-base" />
+          <div>
+            <span className="stat-label text-accent/90">{group.label}</span>
+            <h1 className="text-2xl font-semibold tracking-tight">
+              {league.name}
+            </h1>
+            <p className="text-sm text-text-secondary">
+              {league.country}
+              {selected && ` · ${seasonLabel(selected.value)} season`}
+              {selected && !selected.isLive && (
+                <span className="ml-1 text-text-muted">(archived)</span>
+              )}
+            </p>
           </div>
         </div>
-        {seasons.length > 1 && (
+        {seasons.length > 1 && selected && (
           <div className="relative mt-5">
             <SeasonTabs
               seasons={seasons}
-              active={selected}
+              active={selected.value}
               slug={params.slug}
             />
           </div>
         )}
       </header>
 
-      {isCurrent ? (
-        <CurrentSeason slug={params.slug} season={league.season} />
+      {!selected ? (
+        <p className="card p-8 text-center text-sm text-text-secondary">
+          No match data is available for this competition yet.
+        </p>
+      ) : selected.isLive ? (
+        <LiveSeason slug={params.slug} season={selected} />
       ) : (
-        <PastSeason
-          history={history}
+        <ArchivedSeason
           season={selected}
-          page={Math.max(1, Number(searchParams.page) || 1)}
+          page={page}
           slug={params.slug}
         />
       )}
@@ -115,33 +127,23 @@ export default async function LeaguePage({
   );
 }
 
-/* Current season: live standings + fixtures + results */
-async function CurrentSeason({
+/* Live season: stored standings + upcoming fixtures + recent results */
+async function LiveSeason({
   slug,
   season,
 }: {
   slug: string;
-  season: string;
+  season: SeasonOption;
 }) {
   const [standings, fixtures, results] = await Promise.all([
-    getStandings(slug).catch(() => []),
+    getStandings(season.leagueId, season.value).catch(() => []),
     getLeagueFixtures(slug).catch(() => null),
     getLeagueResults(slug).catch(() => null),
   ]);
-  const rows = standingsForSeason(standings, season);
 
   return (
     <>
-      <section>
-        <SectionHeader eyebrow="Table" title="Standings" />
-        {rows.length > 0 ? (
-          <StandingsTable standings={rows} />
-        ) : (
-          <p className="card p-8 text-center text-sm text-text-secondary">
-            No standings available for this season yet.
-          </p>
-        )}
-      </section>
+      <StandingsSection standings={standings} season={season} />
 
       <section>
         <SectionHeader eyebrow="Upcoming" title="Fixtures" />
@@ -164,56 +166,46 @@ async function CurrentSeason({
   );
 }
 
-/* Past season: archived matches (with stats) for the selected season */
-async function PastSeason({
-  history,
+/* Archived season: computed standings + that season's matches (with stats) */
+async function ArchivedSeason({
   season,
   page,
   slug,
 }: {
-  history: Awaited<ReturnType<typeof getArchiveLeagues>>[number] | null;
-  season: string;
+  season: SeasonOption;
   page: number;
   slug: string;
 }) {
-  if (!history) {
-    return (
-      <p className="card p-8 text-center text-sm text-text-secondary">
-        No archived data available for past seasons of this competition.
-      </p>
-    );
-  }
-
-  const { dateFrom, dateTo } = seasonDateRange(season);
-  const data = await getHistoryMatches({
-    league: history.id,
-    page,
-    dateFrom,
-    dateTo,
-  }).catch(() => ({ count: 0, next: null, previous: null, results: [] }));
+  const { dateFrom, dateTo } = seasonDateRange(season.value);
+  const [standings, data] = await Promise.all([
+    getStandings(season.leagueId, season.value).catch(() => []),
+    getHistoryMatches({
+      league: season.leagueId,
+      page,
+      dateFrom,
+      dateTo,
+    }).catch(() => ({ count: 0, next: null, previous: null, results: [] })),
+  ]);
 
   const totalPages = Math.max(1, Math.ceil(data.count / PAGE_SIZE));
 
   return (
     <>
-      <section>
-        <div className="card flex items-center gap-3 p-4 text-sm text-text-secondary">
-          <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-raised text-text-primary">
-            i
-          </span>
-          League tables aren&apos;t recorded for archived seasons — showing the{" "}
-          <span className="text-text-primary">
-            {data.count.toLocaleString()}
-          </span>{" "}
-          matches from {seasonLabel(season)} with full stats.
-        </div>
-      </section>
+      <StandingsSection standings={standings} season={season} />
 
       <section>
         <SectionHeader
           eyebrow="Archive"
-          title={`${seasonLabel(season)} matches`}
-        />
+          title={`${seasonLabel(season.value)} matches`}
+        >
+          <span className="chip">
+            <span className="font-mono text-text-primary">
+              {data.count.toLocaleString()}
+            </span>
+            played
+          </span>
+        </SectionHeader>
+
         {data.results.length === 0 ? (
           <p className="card p-8 text-center text-sm text-text-secondary">
             No matches recorded for this season.
@@ -230,7 +222,7 @@ async function PastSeason({
           <div className="mt-5 flex items-center justify-between">
             <PageLink
               slug={slug}
-              season={season}
+              season={season.value}
               page={page - 1}
               disabled={page <= 1}
             >
@@ -241,7 +233,7 @@ async function PastSeason({
             </span>
             <PageLink
               slug={slug}
-              season={season}
+              season={season.value}
               page={page + 1}
               disabled={page >= totalPages}
             >
@@ -251,6 +243,31 @@ async function PastSeason({
         )}
       </section>
     </>
+  );
+}
+
+function StandingsSection({
+  standings,
+  season,
+}: {
+  standings: Awaited<ReturnType<typeof getStandings>>;
+  season: SeasonOption;
+}) {
+  return (
+    <section>
+      <SectionHeader eyebrow="Table" title="Standings">
+        {standings.length > 0 && !season.isLive && (
+          <span className="chip">computed from results</span>
+        )}
+      </SectionHeader>
+      {standings.length > 0 ? (
+        <StandingsTable standings={standings} />
+      ) : (
+        <p className="card p-8 text-center text-sm text-text-secondary">
+          No standings available for this season.
+        </p>
+      )}
+    </section>
   );
 }
 
