@@ -24,19 +24,27 @@ from apps.matches.models import (
 
 RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
 
-MAX_RETRIES = 4
+MAX_RETRIES = 6
+# GitHub raw rate-limits under bursty load and returns these (often a spurious
+# 400) — they're transient, so back off and retry rather than dropping a match.
+_TRANSIENT_STATUSES = {400, 403, 408, 425, 429, 500, 502, 503, 504}
 
 
 def _get(url):
-    """GET JSON with retries on transient network errors (timeouts, 5xx, reset)."""
+    """GET JSON, retrying transient network + rate-limit errors with backoff."""
     last_exc = None
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             resp = requests.get(url, timeout=60)
             resp.raise_for_status()
             return resp.json()
-        except requests.HTTPError:
-            raise  # 404 etc. — a real "not found", let the caller decide
+        except requests.HTTPError as exc:
+            status = exc.response.status_code if exc.response is not None else None
+            if status not in _TRANSIENT_STATUSES:
+                raise  # 404 etc. — a real "not found", let the caller decide
+            last_exc = exc
+            if attempt < MAX_RETRIES:
+                time.sleep(attempt * 3)  # 3,6,9,12,15s backoff
         except requests.RequestException as exc:  # timeout / connection reset
             last_exc = exc
             if attempt < MAX_RETRIES:
