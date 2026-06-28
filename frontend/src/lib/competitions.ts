@@ -78,8 +78,10 @@ export function competitionGroupOf(league: {
     (name.includes("premier league") && country.includes("england")) ||
     name.includes("la liga") ||
     name.includes("laliga") ||
+    // La Liga is stored as "Primera Division" (Spain) in the data
+    (name.includes("primera divis") && country.includes("spain")) ||
     (name.includes("serie a") && country.includes("ital")) ||
-    name.includes("bundesliga") ||
+    (name.includes("bundesliga") && !name.includes("2.")) ||
     name.includes("ligue 1");
   if (isTop5) return "top5";
 

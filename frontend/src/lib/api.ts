@@ -33,8 +33,10 @@ async function get<T>(path: string, opts: FetchOpts = {}): Promise<T> {
   return res.json() as Promise<T>;
 }
 
-// Leagues
-export const getLeagues = () => get<Paginated<League>>("/leagues/");
+// Leagues — only the current-season active competitions (the full set fits in
+// one page; the default unfiltered list is dominated by archived history rows).
+export const getLeagues = () =>
+  get<Paginated<League>>("/leagues/?is_active=true");
 export const getLeague = (idOrSlug: string | number) =>
   get<League>(`/leagues/${idOrSlug}/`);
 export const getStandings = (idOrSlug: string | number) =>
