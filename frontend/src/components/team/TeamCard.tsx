@@ -1,5 +1,6 @@
 import Link from "next/link";
 import type { TeamMini } from "@/lib/types";
+import { cn } from "@/lib/utils";
 
 export default function TeamCard({
   team,
@@ -8,29 +9,29 @@ export default function TeamCard({
   team: TeamMini;
   align?: "left" | "right";
 }) {
-  const content = (
-    <>
-      {team.logo_url ? (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={team.logo_url}
-          alt={team.name}
-          className="h-6 w-6 object-contain"
-        />
-      ) : (
-        <span className="h-6 w-6 rounded-full bg-surface-raised inline-block" />
-      )}
-      <span className="truncate">{team.name}</span>
-    </>
+  const logo = team.logo_url ? (
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
+      src={team.logo_url}
+      alt=""
+      className="h-7 w-7 shrink-0 object-contain"
+    />
+  ) : (
+    <span className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-surface-raised text-[10px] font-medium text-text-secondary">
+      {team.short_name?.slice(0, 3) || team.name.slice(0, 2)}
+    </span>
   );
+
   return (
     <Link
       href={`/team/${team.id}`}
-      className={`flex items-center gap-2 hover:text-grass-green transition-colors ${
-        align === "right" ? "flex-row-reverse text-right" : ""
-      }`}
+      className={cn(
+        "group flex min-w-0 items-center gap-2.5 transition-colors hover:text-accent",
+        align === "right" && "flex-row-reverse text-right"
+      )}
     >
-      {content}
+      {logo}
+      <span className="truncate font-medium">{team.name}</span>
     </Link>
   );
 }

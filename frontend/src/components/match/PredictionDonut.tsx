@@ -5,9 +5,9 @@ import type { Prediction } from "@/lib/types";
 import StatLabel from "@/components/ui/StatLabel";
 
 const COLORS = {
-  HOME: "#00D46A", // grass-green
-  DRAW: "#FFB800", // amber-goal
-  AWAY: "#FF3B3B", // red-card
+  HOME: "#34D399", // grass-green
+  DRAW: "#FBBF24", // amber-goal
+  AWAY: "#F87171", // red-card
 };
 
 export default function PredictionDonut({

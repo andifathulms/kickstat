@@ -16,7 +16,13 @@ function liveMinute(kickoff: string): string {
   return `${diffMin}'`;
 }
 
-export default function MatchCard({ match }: { match: MatchListItem }) {
+export default function MatchCard({
+  match,
+  showLeague = false,
+}: {
+  match: MatchListItem;
+  showLeague?: boolean;
+}) {
   const isLive = match.status === "LIVE";
   const [minute, setMinute] = useState(() =>
     isLive ? liveMinute(match.kickoff) : ""
@@ -34,20 +40,24 @@ export default function MatchCard({ match }: { match: MatchListItem }) {
     <Link
       href={`/match/${match.id}`}
       className={cn(
-        "card p-4 block hover:border-text-secondary/40 transition-colors",
+        "card card-hover block p-4",
         isLive && "border-grass-green/40 animate-live-pulse"
       )}
     >
-      <div className="flex items-center justify-between mb-3">
-        <span className="text-xs text-text-secondary truncate">
-          {match.league_name}
+      <div className="mb-3 flex items-center justify-between">
+        <span className="truncate text-xs text-text-secondary">
+          {showLeague
+            ? match.league_name
+            : match.matchday
+              ? `Matchday ${match.matchday}`
+              : " "}
         </span>
         {isLive ? (
-          <LiveBadge />
+          <LiveBadge minute={minute} />
         ) : match.status === "FINISHED" ? (
-          <span className="text-xs text-text-secondary">FT</span>
+          <span className="chip px-2 py-0.5 text-[10px] font-medium">FT</span>
         ) : (
-          <span className="text-xs text-text-secondary">
+          <span className="font-mono text-xs text-text-secondary">
             {formatKickoffTime(match.kickoff)}
           </span>
         )}
@@ -55,20 +65,16 @@ export default function MatchCard({ match }: { match: MatchListItem }) {
 
       <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-3">
         <TeamCard team={match.home_team} />
-        <div className="text-center">
+        <div className="px-2 text-center">
           {match.status === "SCHEDULED" ? (
-            <span className="font-mono text-text-secondary text-sm">vs</span>
+            <span className="font-mono text-sm text-text-muted">vs</span>
           ) : (
             <ScoreBig
               home={match.home_score}
               away={match.away_score}
-              className="text-xl"
+              className="text-2xl"
+              live={isLive}
             />
-          )}
-          {isLive && (
-            <div className="text-[11px] text-grass-green font-mono mt-0.5">
-              {minute}
-            </div>
           )}
         </div>
         <TeamCard team={match.away_team} align="right" />

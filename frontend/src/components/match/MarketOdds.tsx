@@ -33,9 +33,9 @@ export default function MarketOdds({
   }
 
   const rows = [
-    { label: "Home", prob: p.home, odd: odds?.home_odds, color: "#00D46A" },
-    { label: "Draw", prob: p.draw, odd: odds?.draw_odds, color: "#FFB800" },
-    { label: "Away", prob: p.away, odd: odds?.away_odds, color: "#FF3B3B" },
+    { label: "Home", prob: p.home, odd: odds?.home_odds, color: "#34D399" },
+    { label: "Draw", prob: p.draw, odd: odds?.draw_odds, color: "#FBBF24" },
+    { label: "Away", prob: p.away, odd: odds?.away_odds, color: "#F87171" },
   ];
   return (
     <div className="card p-5">

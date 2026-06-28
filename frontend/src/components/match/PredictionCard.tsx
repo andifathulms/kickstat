@@ -1,11 +1,11 @@
 import Link from "next/link";
 import type { Prediction, MatchListItem } from "@/lib/types";
-import StatLabel from "@/components/ui/StatLabel";
+import { cn } from "@/lib/utils";
 
-const OUTCOME_COLOR = {
-  HOME: "text-grass-green",
-  DRAW: "text-amber-goal",
-  AWAY: "text-red-card",
+const OUTCOME = {
+  HOME: { color: "text-grass-green", bar: "bg-grass-green", label: "Home win" },
+  DRAW: { color: "text-amber-goal", bar: "bg-amber-goal", label: "Draw" },
+  AWAY: { color: "text-red-card", bar: "bg-red-card", label: "Away win" },
 };
 
 /** Compact prediction pick card (predictions hub + home "top picks"). */
@@ -15,34 +15,50 @@ export default function PredictionCard({
   prediction: Prediction;
 }) {
   const match = prediction.match as MatchListItem;
+  const o = OUTCOME[prediction.predicted_outcome];
   const pickLabel =
     prediction.predicted_outcome === "HOME"
       ? match.home_team.name
       : prediction.predicted_outcome === "AWAY"
         ? match.away_team.name
         : "Draw";
+  const confidence = Math.round(prediction.confidence_score * 100);
 
   return (
-    <Link href={`/match/${match.id}`} className="card p-4 block hover:border-text-secondary/40">
-      <div className="flex items-center justify-between mb-2">
-        <span className="text-xs text-text-secondary truncate">
+    <Link
+      href={`/match/${match.id}`}
+      className="card card-hover block overflow-hidden p-4"
+    >
+      <div className="mb-3 flex items-center justify-between">
+        <span className="truncate text-xs text-text-secondary">
           {match.league_name}
         </span>
-        <span className="font-mono text-sm">
-          {Math.round(prediction.confidence_score * 100)}%
+        <span
+          className={cn(
+            "rounded-full px-2 py-0.5 text-[11px] font-medium",
+            confidence >= 60
+              ? "bg-accent/15 text-accent"
+              : "bg-surface-raised text-text-secondary"
+          )}
+        >
+          {confidence}% conf.
         </span>
       </div>
-      <div className="text-sm mb-3">
+
+      <div className="mb-3 truncate text-sm font-medium">
         {match.home_team.name}{" "}
-        <span className="text-text-secondary">vs</span> {match.away_team.name}
+        <span className="text-text-muted">vs</span> {match.away_team.name}
       </div>
-      <StatLabel>Pick</StatLabel>
-      <div
-        className={`font-medium ${OUTCOME_COLOR[prediction.predicted_outcome]}`}
-      >
-        {pickLabel}
+
+      <div className="mb-3 flex items-baseline justify-between gap-2">
+        <span className="stat-label">Model pick</span>
+        <span className={cn("truncate text-sm font-semibold", o.color)}>
+          {pickLabel}
+        </span>
       </div>
-      <div className="mt-3 flex h-1.5 overflow-hidden rounded">
+
+      {/* probability split */}
+      <div className="flex h-2 overflow-hidden rounded-full bg-surface-raised">
         <div
           className="bg-grass-green"
           style={{ width: `${prediction.home_win_prob * 100}%` }}
@@ -55,6 +71,11 @@ export default function PredictionCard({
           className="bg-red-card"
           style={{ width: `${prediction.away_win_prob * 100}%` }}
         />
+      </div>
+      <div className="mt-1.5 flex justify-between font-mono text-[10px] text-text-secondary">
+        <span>{Math.round(prediction.home_win_prob * 100)}%</span>
+        <span>{Math.round(prediction.draw_prob * 100)}%</span>
+        <span>{Math.round(prediction.away_win_prob * 100)}%</span>
       </div>
     </Link>
   );

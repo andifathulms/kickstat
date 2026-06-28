@@ -1,8 +1,10 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import type { MatchDetail } from "@/lib/types";
 import { cn, formatKickoffDate, formatKickoffTime } from "@/lib/utils";
+import { seasonLabel } from "@/lib/competitions";
 import LiveBadge from "@/components/ui/LiveBadge";
 import ScoreBig from "@/components/ui/ScoreBig";
 import StatLabel from "@/components/ui/StatLabel";
@@ -21,56 +23,84 @@ export default function MatchCenter({ match }: { match: MatchDetail }) {
 
   return (
     <div className="space-y-5">
+      {/* Breadcrumb */}
+      <nav className="flex items-center gap-2 text-xs text-text-secondary">
+        <Link href="/" className="hover:text-accent">
+          Home
+        </Link>
+        <span className="text-text-muted">/</span>
+        <Link
+          href={`/league/${match.league.slug}`}
+          className="hover:text-accent"
+        >
+          {match.league.name}
+        </Link>
+        {match.matchday && (
+          <>
+            <span className="text-text-muted">/</span>
+            <span>Matchday {match.matchday}</span>
+          </>
+        )}
+      </nav>
+
       {/* Header */}
       <div
         className={cn(
-          "card p-6",
+          "card relative overflow-hidden p-6",
           isLive && "border-grass-green/40 animate-live-pulse"
         )}
       >
-        <div className="flex items-center justify-center gap-3 mb-4 text-text-secondary text-sm">
-          <span>{match.league_name}</span>
-          {match.matchday && <span>· MD {match.matchday}</span>}
-        </div>
-        <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
-          <div className="justify-self-end text-lg">
-            <TeamCard team={match.home_team} align="right" />
+        <div className="pointer-events-none absolute inset-0 bg-accent-sheen opacity-60" />
+        <div className="relative">
+          <div className="mb-5 flex items-center justify-center gap-2 text-xs text-text-secondary">
+            <span>{match.league.name}</span>
+            {match.league.season && (
+              <span className="chip px-2 py-0.5 font-mono text-[10px]">
+                {seasonLabel(match.league.season)}
+              </span>
+            )}
           </div>
-          <div className="text-center">
-            <ScoreBig
-              home={match.home_score}
-              away={match.away_score}
-              className="text-4xl"
-            />
-            <div className="mt-2">
-              {isLive ? (
-                <LiveBadge />
-              ) : match.status === "FINISHED" ? (
-                <StatLabel>Full time</StatLabel>
-              ) : (
-                <div className="text-text-secondary text-sm">
-                  {formatKickoffDate(match.kickoff)} ·{" "}
-                  {formatKickoffTime(match.kickoff)}
-                </div>
-              )}
+          <div className="grid grid-cols-[1fr_auto_1fr] items-center gap-4">
+            <div className="justify-self-end text-lg">
+              <TeamCard team={match.home_team} align="right" />
             </div>
-          </div>
-          <div className="justify-self-start text-lg">
-            <TeamCard team={match.away_team} />
+            <div className="text-center">
+              <ScoreBig
+                home={match.home_score}
+                away={match.away_score}
+                className="text-5xl"
+                live={isLive}
+              />
+              <div className="mt-3 flex justify-center">
+                {isLive ? (
+                  <LiveBadge />
+                ) : match.status === "FINISHED" ? (
+                  <StatLabel>Full time</StatLabel>
+                ) : (
+                  <div className="text-sm text-text-secondary">
+                    {formatKickoffDate(match.kickoff)} ·{" "}
+                    {formatKickoffTime(match.kickoff)}
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="justify-self-start text-lg">
+              <TeamCard team={match.away_team} />
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 border-b border-border">
+      <div className="flex gap-1 overflow-x-auto border-b border-border">
         {TABS.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={cn(
-              "px-4 py-2 text-sm -mb-px border-b-2 transition-colors",
+              "-mb-px whitespace-nowrap border-b-2 px-4 py-2.5 text-sm transition-colors",
               tab === t
-                ? "border-grass-green text-text-primary"
+                ? "border-accent text-text-primary"
                 : "border-transparent text-text-secondary hover:text-text-primary"
             )}
           >

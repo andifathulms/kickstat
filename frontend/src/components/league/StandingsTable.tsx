@@ -1,35 +1,44 @@
 import Link from "next/link";
 import type { Standing } from "@/lib/types";
-import StatLabel from "@/components/ui/StatLabel";
+import { cn } from "@/lib/utils";
 
-const COLS: { key: keyof Standing | "team"; label: string }[] = [
+const COLS: { key: keyof Standing; label: string; em?: boolean }[] = [
   { key: "played", label: "P" },
   { key: "won", label: "W" },
   { key: "drawn", label: "D" },
   { key: "lost", label: "L" },
   { key: "goal_difference", label: "GD" },
-  { key: "points", label: "Pts" },
+  { key: "points", label: "Pts", em: true },
 ];
+
+/** Accent stripe on the position cell to hint at zones (top / relegation). */
+function zoneClass(position: number, total: number): string {
+  if (position <= 4) return "before:bg-grass-green"; // CL-ish
+  if (position <= 6) return "before:bg-amber-goal"; // Europa-ish
+  if (total >= 18 && position > total - 3) return "before:bg-red-card"; // drop
+  return "before:bg-transparent";
+}
 
 export default function StandingsTable({
   standings,
 }: {
   standings: Standing[];
 }) {
+  const total = standings.length;
   return (
     <div className="card overflow-hidden">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-border">
-            <th className="text-left py-3 pl-4 pr-2 w-8">
-              <StatLabel>#</StatLabel>
+          <tr className="border-b border-border text-text-secondary">
+            <th className="w-10 py-3 pl-4 pr-2 text-left">
+              <span className="stat-label">#</span>
             </th>
-            <th className="text-left py-3 px-2">
-              <StatLabel>Team</StatLabel>
+            <th className="py-3 px-2 text-left">
+              <span className="stat-label">Team</span>
             </th>
             {COLS.map((c) => (
-              <th key={c.label} className="text-right py-3 px-2 w-10">
-                <StatLabel>{c.label}</StatLabel>
+              <th key={c.label} className="w-10 py-3 px-2 text-right">
+                <span className="stat-label">{c.label}</span>
               </th>
             ))}
           </tr>
@@ -38,15 +47,21 @@ export default function StandingsTable({
           {standings.map((s) => (
             <tr
               key={s.id}
-              className="border-b border-border/50 last:border-0 hover:bg-surface-raised/40"
+              className="border-b border-border/40 transition-colors last:border-0 hover:bg-surface-raised/50"
             >
-              <td className="py-2.5 pl-4 pr-2 font-mono text-text-secondary">
+              <td
+                className={cn(
+                  "relative py-2.5 pl-4 pr-2 font-mono text-text-secondary",
+                  "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full",
+                  zoneClass(s.position, total)
+                )}
+              >
                 {s.position}
               </td>
               <td className="py-2.5 px-2">
                 <Link
                   href={`/team/${s.team.id}`}
-                  className="flex items-center gap-2 hover:text-grass-green"
+                  className="flex items-center gap-2.5 transition-colors hover:text-accent"
                 >
                   {s.team.logo_url ? (
                     // eslint-disable-next-line @next/next/no-img-element
@@ -56,19 +71,24 @@ export default function StandingsTable({
                       className="h-5 w-5 object-contain"
                     />
                   ) : (
-                    <span className="h-5 w-5 rounded-full bg-surface-raised inline-block" />
+                    <span className="h-5 w-5 rounded-full bg-surface-raised" />
                   )}
-                  <span className="truncate">{s.team.name}</span>
+                  <span className="truncate font-medium">{s.team.name}</span>
                 </Link>
               </td>
               {COLS.map((c) => (
                 <td
                   key={c.label}
-                  className={`py-2.5 px-2 text-right font-mono tabular-nums ${
-                    c.key === "points" ? "text-text-primary font-medium" : ""
-                  }`}
+                  className={cn(
+                    "py-2.5 px-2 text-right font-mono tabular-nums",
+                    c.em
+                      ? "font-semibold text-text-primary"
+                      : "text-text-secondary"
+                  )}
                 >
-                  {String(s[c.key as keyof Standing])}
+                  {c.key === "goal_difference" && s.goal_difference > 0
+                    ? `+${s.goal_difference}`
+                    : String(s[c.key])}
                 </td>
               ))}
             </tr>
