@@ -6,14 +6,90 @@
 @layer base {
   body {
     @apply bg-pitch-black text-text-primary font-sans antialiased;
+    /* subtle ambient glow behind the page */
+    background-image: radial-gradient(
+        1200px 600px at 75% -10%,
+        rgba(198, 255, 61, 0.05),
+        transparent 60%
+      ),
+      radial-gradient(
+        900px 500px at 5% 0%,
+        rgba(52, 211, 153, 0.04),
+        transparent 55%
+      );
+    background-attachment: fixed;
+  }
+
+  ::selection {
+    background: rgba(198, 255, 61, 0.25);
+    color: var(--text-primary);
+  }
+
+  /* Quiet, on-brand scrollbars for the many horizontal scroll regions */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--border-strong) transparent;
+  }
+  *::-webkit-scrollbar {
+    height: 8px;
+    width: 8px;
+  }
+  *::-webkit-scrollbar-thumb {
+    background: var(--border-strong);
+    border-radius: 9999px;
+  }
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--accent);
+    outline-offset: 2px;
+    border-radius: 6px;
   }
 }
 
 @layer components {
   .stat-label {
-    @apply text-[11px] uppercase tracking-widest text-text-secondary;
+    @apply text-[11px] uppercase tracking-[0.14em] text-text-secondary font-medium;
   }
+
+  /* Primary panel — cards, tables, stat blocks */
   .card {
-    @apply bg-surface border border-border rounded-xl;
+    @apply bg-surface border border-border rounded-xl shadow-panel;
+  }
+
+  /* Interactive card: lifts + accent-tinted edge on hover */
+  .card-hover {
+    @apply transition-all duration-150 hover:border-border-strong hover:bg-surface-raised/50;
+  }
+
+  /* Pill / chip building blocks */
+  .chip {
+    @apply inline-flex items-center gap-1.5 rounded-full bg-surface-raised px-2.5 py-1 text-xs text-text-secondary;
+  }
+  .pill {
+    @apply inline-flex items-center justify-center gap-1.5 whitespace-nowrap rounded-full px-3 py-1.5 text-sm transition-colors;
+  }
+  .pill-active {
+    @apply bg-accent text-accent-ink font-medium;
+  }
+  .pill-idle {
+    @apply bg-surface-raised text-text-secondary hover:text-text-primary;
+  }
+
+  /* Primary accent button */
+  .btn-accent {
+    @apply inline-flex items-center gap-2 rounded-lg bg-accent px-4 py-2 text-sm font-medium text-accent-ink transition-transform hover:-translate-y-0.5;
+  }
+
+  /* Section heading rule */
+  .section-title {
+    @apply text-sm font-semibold uppercase tracking-[0.12em] text-text-primary;
+  }
+
+  /* Thin gradient divider */
+  .hairline {
+    @apply h-px w-full bg-gradient-to-r from-border via-border-strong to-transparent;
   }
 }
