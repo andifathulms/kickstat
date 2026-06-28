@@ -12,6 +12,8 @@ import StatBar from "@/components/match/StatBar";
 import PredictionDonut from "@/components/match/PredictionDonut";
 import MarketOdds from "@/components/match/MarketOdds";
 import ScorelinePanel from "@/components/match/ScorelinePanel";
+import MatchTimeline from "@/components/match/MatchTimeline";
+import Lineups from "@/components/match/Lineups";
 import TeamCard from "@/components/team/TeamCard";
 
 const TABS = ["Overview", "Stats", "Prediction", "Lineups"] as const;
@@ -109,45 +111,29 @@ export default function MatchCenter({ match }: { match: MatchDetail }) {
         ))}
       </div>
 
-      {tab === "Overview" && <Overview match={match} />}
+      {tab === "Overview" && <MatchTimeline match={match} />}
       {tab === "Stats" && <Stats match={match} />}
       {tab === "Prediction" && <PredictionTab match={match} />}
-      {tab === "Lineups" && (
-        <p className="text-text-secondary text-sm card p-6">
-          Lineups are not available for this match yet.
-        </p>
-      )}
+      {tab === "Lineups" && <Lineups match={match} />}
     </div>
   );
 }
 
-function Overview({ match }: { match: MatchDetail }) {
-  if (match.events.length === 0) {
-    return (
-      <p className="text-text-secondary text-sm card p-6">
-        No key events recorded yet.
-      </p>
-    );
-  }
-  return (
-    <div className="card p-5">
-      <StatLabel>Key events</StatLabel>
-      <ul className="mt-4 space-y-3">
-        {match.events.map((e) => (
-          <li key={e.id} className="flex items-center gap-3 text-sm">
-            <span className="font-mono text-text-secondary w-10">
-              {e.minute ?? "–"}&apos;
-            </span>
-            <span className="rounded bg-surface-raised px-2 py-0.5 text-xs">
-              {e.type}
-            </span>
-            <span>{e.player_name || e.team?.name || ""}</span>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
-}
+// Extended stats (from StatsBomb events) shown beneath the headline bars.
+const EXTRA_ROWS: { key: string; label: string; pct?: boolean }[] = [
+  { key: "passes", label: "Passes" },
+  { key: "pass_accuracy", label: "Pass accuracy", pct: true },
+  { key: "crosses", label: "Crosses" },
+  { key: "throw_ins", label: "Throw-ins" },
+  { key: "offsides", label: "Offsides" },
+  { key: "interceptions", label: "Interceptions" },
+  { key: "blocks", label: "Blocks" },
+  { key: "clearances", label: "Clearances" },
+  { key: "dribbles", label: "Dribbles" },
+  { key: "ball_recoveries", label: "Recoveries" },
+  { key: "duels_won", label: "Duels won" },
+  { key: "saves", label: "Saves" },
+];
 
 function Stats({ match }: { match: MatchDetail }) {
   const s = match.stats;
@@ -158,16 +144,52 @@ function Stats({ match }: { match: MatchDetail }) {
       </p>
     );
   }
+  const extra = s.extra;
   return (
-    <div className="card p-5 space-y-4">
-      <StatBar label="Possession" home={s.home_possession} away={s.away_possession} suffix="%" />
-      <StatBar label="Shots" home={s.home_shots} away={s.away_shots} />
-      <StatBar label="On target" home={s.home_shots_on_target} away={s.away_shots_on_target} />
-      <StatBar label="Corners" home={s.home_corners} away={s.away_corners} />
-      <StatBar label="Fouls" home={s.home_fouls} away={s.away_fouls} />
-      <StatBar label="xG" home={s.home_xg} away={s.away_xg} />
+    <div className="space-y-4">
+      <div className="card p-5 space-y-4">
+        <StatBar label="Possession" home={s.home_possession} away={s.away_possession} suffix="%" />
+        <StatBar label="xG" home={s.home_xg} away={s.away_xg} />
+        <StatBar label="Shots" home={s.home_shots} away={s.away_shots} />
+        <StatBar label="On target" home={s.home_shots_on_target} away={s.away_shots_on_target} />
+        <StatBar label="Corners" home={s.home_corners} away={s.away_corners} />
+        <StatBar label="Fouls" home={s.home_fouls} away={s.away_fouls} />
+        <StatBar label="Yellow cards" home={s.home_yellow_cards} away={s.away_yellow_cards} />
+        <StatBar label="Red cards" home={s.home_red_cards} away={s.away_red_cards} />
+      </div>
+
+      {extra && (
+        <div className="card p-5">
+          <StatLabel>Detailed stats</StatLabel>
+          <div className="mt-3 divide-y divide-border/40">
+            {EXTRA_ROWS.filter(
+              (r) => extra.home[r.key] != null || extra.away[r.key] != null
+            ).map((r) => (
+              <div
+                key={r.key}
+                className="grid grid-cols-[3rem_1fr_3rem] items-center gap-3 py-2 text-sm"
+              >
+                <span className="text-left font-mono tabular-nums">
+                  {fmt(extra.home[r.key], r.pct)}
+                </span>
+                <span className="text-center text-xs text-text-secondary">
+                  {r.label}
+                </span>
+                <span className="text-right font-mono tabular-nums">
+                  {fmt(extra.away[r.key], r.pct)}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+function fmt(v: number | null | undefined, pct?: boolean): string {
+  if (v == null) return "–";
+  return pct ? `${v}%` : String(v);
 }
 
 function PredictionTab({ match }: { match: MatchDetail }) {

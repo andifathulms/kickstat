@@ -34,12 +34,16 @@ EVENTS = [
     {"type": {"name": "Pass"}, "team": {"name": "Barcelona"}},
 ]
 
+LINEUPS = []
+
 
 def fake_get(url):
     if url.endswith("competitions.json"):
         return COMPETITIONS
     if "/matches/" in url:
         return MATCHES
+    if "/lineups/" in url:
+        return LINEUPS
     if "/events/" in url:
         return EVENTS
     raise AssertionError(f"unexpected url {url}")

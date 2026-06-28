@@ -31,6 +31,11 @@ class Match(BaseModel):
     away_score = models.PositiveIntegerField(null=True, blank=True)
     external_id = models.CharField(max_length=64, unique=True)
     raw_data = models.JSONField(default=dict, blank=True)
+    # Match metadata (populated where the source provides it, e.g. StatsBomb)
+    referee = models.CharField(max_length=120, blank=True)
+    stadium = models.CharField(max_length=160, blank=True)
+    home_manager = models.CharField(max_length=120, blank=True)
+    away_manager = models.CharField(max_length=120, blank=True)
 
     class Meta:
         ordering = ["kickoff"]
@@ -63,6 +68,10 @@ class MatchStats(BaseModel):
     away_red_cards = models.PositiveIntegerField(null=True, blank=True)
     home_xg = models.FloatField(null=True, blank=True)
     away_xg = models.FloatField(null=True, blank=True)
+    # The long tail of derivable stats (passes, pass accuracy, crosses,
+    # throw-ins, offsides, tackles, interceptions, saves, …) keyed
+    # {"home": {...}, "away": {...}} so no source metric is dropped.
+    extra = models.JSONField(default=dict, blank=True)
 
     class Meta:
         verbose_name_plural = "Match stats"
@@ -108,6 +117,7 @@ class MatchOdds(BaseModel):
 
 class EventType(models.TextChoices):
     GOAL = "GOAL", "Goal"
+    OWN_GOAL = "OWN_GOAL", "Own goal"
     YELLOW = "YELLOW", "Yellow card"
     RED = "RED", "Red card"
     SUBSTITUTION = "SUBSTITUTION", "Substitution"
@@ -126,6 +136,15 @@ class MatchEvent(BaseModel):
     player = models.ForeignKey(
         Player, related_name="events", on_delete=models.SET_NULL, null=True, blank=True
     )
+    # Goals: the assisting player. Substitutions: the player coming on (the
+    # `player` field holds the player going off).
+    assist = models.ForeignKey(
+        Player,
+        related_name="assist_events",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+    )
     detail = models.JSONField(default=dict, blank=True)
 
     class Meta:
@@ -133,3 +152,33 @@ class MatchEvent(BaseModel):
 
     def __str__(self):
         return f"{self.minute}' {self.type} — {self.match}"
+
+
+class MatchLineup(BaseModel):
+    """A player's involvement in a single match (starting XI or bench)."""
+
+    match = models.ForeignKey(
+        Match, related_name="lineups", on_delete=models.CASCADE
+    )
+    team = models.ForeignKey(
+        Team, related_name="lineups", on_delete=models.CASCADE
+    )
+    player = models.ForeignKey(
+        Player, related_name="lineups", on_delete=models.CASCADE
+    )
+    shirt_number = models.PositiveIntegerField(null=True, blank=True)
+    position = models.CharField(max_length=60, blank=True)
+    is_starter = models.BooleanField(default=False)
+    subbed_on_minute = models.PositiveIntegerField(null=True, blank=True)
+    subbed_off_minute = models.PositiveIntegerField(null=True, blank=True)
+
+    class Meta:
+        ordering = ["-is_starter", "shirt_number"]
+        constraints = [
+            models.UniqueConstraint(
+                fields=["match", "player"], name="uniq_match_player_lineup"
+            )
+        ]
+
+    def __str__(self):
+        return f"{self.player} ({self.match})"

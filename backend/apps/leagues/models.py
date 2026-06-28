@@ -79,6 +79,7 @@ class Team(BaseModel):
 
 class Player(BaseModel):
     name = models.CharField(max_length=120)
+    nickname = models.CharField(max_length=120, blank=True)
     position = models.CharField(max_length=40, blank=True)
     nationality = models.CharField(max_length=80, blank=True)
     date_of_birth = models.DateField(null=True, blank=True)

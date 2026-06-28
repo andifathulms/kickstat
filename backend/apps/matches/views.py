@@ -28,7 +28,11 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
         )
         if self.action == "retrieve":
             qs = qs.select_related("stats", "odds").prefetch_related(
-                "events__team", "events__player", "prediction", "score_prediction"
+                "events__player",
+                "events__assist",
+                "lineups__player",
+                "prediction",
+                "score_prediction",
             )
         elif self._wants_stats():
             qs = qs.select_related("stats", "odds")
@@ -57,7 +61,7 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
     @action(detail=True)
     def events(self, request, pk=None):
         match = get_object_or_404(Match, pk=pk)
-        qs = match.events.select_related("team", "player").order_by("minute")
+        qs = match.events.select_related("player", "assist").order_by("minute")
         return Response(MatchEventSerializer(qs, many=True).data)
 
     @action(detail=True)

@@ -72,16 +72,41 @@ export interface MatchStats {
   away_red_cards: number | null;
   home_xg: number | null;
   away_xg: number | null;
+  extra?: { home: SideStats; away: SideStats } | null;
 }
+
+export type MatchEventType =
+  | "GOAL"
+  | "OWN_GOAL"
+  | "YELLOW"
+  | "RED"
+  | "SUBSTITUTION"
+  | "VAR";
 
 export interface MatchEvent {
   id: number;
   minute: number | null;
-  type: "GOAL" | "YELLOW" | "RED" | "SUBSTITUTION" | "VAR";
-  team: TeamMini | null;
+  type: MatchEventType;
+  /** team id (null if unknown) */
+  team: number | null;
   player_name: string | null;
+  assist_name: string | null;
   detail: Record<string, unknown>;
 }
+
+export interface MatchLineupEntry {
+  team: number;
+  player_id: number;
+  player_name: string;
+  player_nickname: string;
+  shirt_number: number | null;
+  position: string;
+  is_starter: boolean;
+  subbed_on_minute: number | null;
+  subbed_off_minute: number | null;
+}
+
+export type SideStats = Record<string, number | null>;
 
 export interface Prediction {
   id: number;
@@ -133,9 +158,14 @@ export interface ScorePrediction {
 
 export interface MatchDetail extends Omit<MatchListItem, "league"> {
   league: League;
+  referee: string;
+  stadium: string;
+  home_manager: string;
+  away_manager: string;
   stats: MatchStats | null;
   odds: MatchOdds | null;
   events: MatchEvent[];
+  lineups: MatchLineupEntry[];
   prediction: Prediction | null;
   score_prediction: ScorePrediction | null;
 }

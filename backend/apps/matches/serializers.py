@@ -2,7 +2,7 @@ from rest_framework import serializers
 
 from apps.leagues.serializers import LeagueSerializer, TeamMiniSerializer
 
-from .models import Match, MatchEvent, MatchOdds, MatchStats
+from .models import Match, MatchEvent, MatchLineup, MatchOdds, MatchStats
 
 
 class MatchStatsSerializer(serializers.ModelSerializer):
@@ -31,12 +31,44 @@ class MatchOddsSerializer(serializers.ModelSerializer):
 
 
 class MatchEventSerializer(serializers.ModelSerializer):
-    team = TeamMiniSerializer(read_only=True)
+    team = serializers.IntegerField(source="team_id", read_only=True)
     player_name = serializers.CharField(source="player.name", read_only=True)
+    assist_name = serializers.CharField(source="assist.name", read_only=True)
 
     class Meta:
         model = MatchEvent
-        fields = ("id", "minute", "type", "team", "player_name", "detail")
+        fields = (
+            "id",
+            "minute",
+            "type",
+            "team",
+            "player_name",
+            "assist_name",
+            "detail",
+        )
+
+
+class MatchLineupSerializer(serializers.ModelSerializer):
+    team = serializers.IntegerField(source="team_id", read_only=True)
+    player_id = serializers.IntegerField(read_only=True)
+    player_name = serializers.CharField(source="player.name", read_only=True)
+    player_nickname = serializers.CharField(
+        source="player.nickname", read_only=True
+    )
+
+    class Meta:
+        model = MatchLineup
+        fields = (
+            "team",
+            "player_id",
+            "player_name",
+            "player_nickname",
+            "shirt_number",
+            "position",
+            "is_starter",
+            "subbed_on_minute",
+            "subbed_off_minute",
+        )
 
 
 class MatchListSerializer(serializers.ModelSerializer):
@@ -81,6 +113,7 @@ class MatchDetailSerializer(MatchListSerializer):
     stats = MatchStatsSerializer(read_only=True)
     odds = MatchOddsSerializer(read_only=True)
     events = MatchEventSerializer(many=True, read_only=True)
+    lineups = MatchLineupSerializer(many=True, read_only=True)
     prediction = serializers.SerializerMethodField()
     score_prediction = serializers.SerializerMethodField()
 
@@ -97,9 +130,14 @@ class MatchDetailSerializer(MatchListSerializer):
             "away_team",
             "home_score",
             "away_score",
+            "referee",
+            "stadium",
+            "home_manager",
+            "away_manager",
             "stats",
             "odds",
             "events",
+            "lineups",
             "prediction",
             "score_prediction",
         )
