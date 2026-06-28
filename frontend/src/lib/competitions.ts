@@ -1,4 +1,4 @@
-import type { League, Standing } from "./types";
+import type { ArchiveLeague, League, Standing } from "./types";
 
 /**
  * Competition segmentation. The backend stores leagues as a flat list with a
@@ -146,4 +146,91 @@ export function standingsForSeason(
   return standings
     .filter((s) => s.season === season)
     .sort((a, b) => a.position - b.position);
+}
+
+/* --- Linking an active competition to its historical archive ------------- */
+
+/**
+ * Active competitions and their `(history)` archive rows don't always share a
+ * name (e.g. active "Primera Division" ↔ "La Liga (history)"). This maps the
+ * active base name to the history base name where they differ.
+ */
+const HISTORY_NAME_ALIAS: Record<string, string> = {
+  "primera division": "la liga",
+};
+
+function baseName(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\s*\(history\)\s*$/, "")
+    .replace(/\s*\(statsbomb[^)]*\)\s*$/, "")
+    .trim();
+}
+
+/** Find the `(history)` archive league that corresponds to an active league. */
+export function findHistoryLeague(
+  active: { name: string; country: string },
+  archive: ArchiveLeague[]
+): ArchiveLeague | null {
+  const target =
+    HISTORY_NAME_ALIAS[active.name.toLowerCase()] ??
+    baseName(active.name);
+  const country = (active.country || "").toLowerCase();
+  return (
+    archive.find(
+      (a) =>
+        a.name.toLowerCase().includes("(history)") &&
+        baseName(a.name) === target &&
+        (a.country || "").toLowerCase() === country
+    ) ?? null
+  );
+}
+
+export interface SeasonOption {
+  /** season-start year as a string, e.g. "2024" */
+  value: string;
+  label: string;
+  isCurrent: boolean;
+}
+
+/**
+ * Build the season list for a competition page: the active current season
+ * (standings + live fixtures) followed by archived seasons (matches only),
+ * newest first.
+ */
+export function leagueSeasonOptions(
+  currentSeason: string,
+  history: ArchiveLeague | null
+): SeasonOption[] {
+  const out: SeasonOption[] = [];
+  const seen = new Set<string>();
+
+  if (currentSeason) {
+    out.push({
+      value: currentSeason,
+      label: seasonLabel(currentSeason),
+      isCurrent: true,
+    });
+    seen.add(currentSeason);
+  }
+
+  if (history?.first_year && history?.last_year) {
+    for (let y = history.last_year; y >= history.first_year; y--) {
+      const v = String(y);
+      if (seen.has(v)) continue;
+      out.push({ value: v, label: seasonLabel(v), isCurrent: false });
+      seen.add(v);
+    }
+  }
+
+  return out;
+}
+
+/** UTC date range (ISO yyyy-mm-dd) covering a single football season. */
+export function seasonDateRange(season: string): {
+  dateFrom: string;
+  dateTo: string;
+} {
+  const y = parseInt(season, 10);
+  return { dateFrom: `${y}-07-01`, dateTo: `${y + 1}-06-30` };
 }
