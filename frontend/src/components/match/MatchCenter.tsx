@@ -9,6 +9,7 @@ import StatLabel from "@/components/ui/StatLabel";
 import StatBar from "@/components/match/StatBar";
 import PredictionDonut from "@/components/match/PredictionDonut";
 import MarketOdds from "@/components/match/MarketOdds";
+import ScorelinePanel from "@/components/match/ScorelinePanel";
 import TeamCard from "@/components/team/TeamCard";
 
 const TABS = ["Overview", "Stats", "Prediction", "Lineups"] as const;
@@ -142,10 +143,11 @@ function Stats({ match }: { match: MatchDetail }) {
 function PredictionTab({ match }: { match: MatchDetail }) {
   const hasPrediction = !!match.prediction;
   const hasOdds = !!match.odds?.implied_probabilities;
-  if (!hasPrediction && !hasOdds) {
+  const hasScore = !!match.score_prediction;
+  if (!hasPrediction && !hasOdds && !hasScore) {
     return (
       <p className="text-text-secondary text-sm card p-6">
-        No prediction or market odds available for this match.
+        No prediction, scoreline, or market odds available for this match.
       </p>
     );
   }
@@ -158,7 +160,14 @@ function PredictionTab({ match }: { match: MatchDetail }) {
           awayName={match.away_team.name}
         />
       )}
-      <MarketOdds odds={match.odds} />
+      {hasScore && (
+        <ScorelinePanel
+          score={match.score_prediction!}
+          homeName={match.home_team.name}
+          awayName={match.away_team.name}
+        />
+      )}
+      {hasOdds && <MarketOdds odds={match.odds} />}
     </div>
   );
 }

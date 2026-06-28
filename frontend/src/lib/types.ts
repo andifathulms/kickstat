@@ -101,12 +101,34 @@ export interface MatchListItem {
   away_score: number | null;
 }
 
+export interface TopScore {
+  home: number;
+  away: number;
+  prob: number;
+}
+
+export interface ScorePrediction {
+  lambda_home: number;
+  lambda_away: number;
+  most_likely_home: number;
+  most_likely_away: number;
+  most_likely_prob: number;
+  home_win_prob: number;
+  draw_prob: number;
+  away_win_prob: number;
+  over25_prob: number;
+  btts_prob: number;
+  top_scores: TopScore[];
+  model_version: string;
+}
+
 export interface MatchDetail extends Omit<MatchListItem, "league"> {
   league: League;
   stats: MatchStats | null;
   odds: MatchOdds | null;
   events: MatchEvent[];
   prediction: Prediction | null;
+  score_prediction: ScorePrediction | null;
 }
 
 export interface ImpliedProbabilities {
