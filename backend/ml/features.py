@@ -36,6 +36,21 @@ FEATURE_ORDER_V2 = FEATURE_ORDER + [
     "away_venue_form_pts",
 ]
 
+# Phase 3 wires in the richer acquired data: each team's recent *market strength*
+# (rolling average of bookmaker-implied win probability — available at inference
+# from history even though the upcoming fixture has no odds) plus rolling
+# possession / shots / corners.
+FEATURE_ORDER_V3 = FEATURE_ORDER_V2 + [
+    "home_market_strength",
+    "away_market_strength",
+    "home_shots_avg",
+    "away_shots_avg",
+    "home_possession_avg",
+    "away_possession_avg",
+    "home_corners_avg",
+    "away_corners_avg",
+]
+
 
 # All recent-form helpers operate on a team's *canonical group* — the set of team
 # ids that represent the same club across data sources (live + historical). This
@@ -227,6 +242,77 @@ def get_features_v2(match_id: int) -> dict:
     return features
 
 
+def _recent_with_data(group_ids, before, limit=10):
+    """Recent finished matches with stats + odds prefetched (wider window for
+    stable rolling averages)."""
+    return list(
+        Match.objects.filter(
+            Q(home_team_id__in=group_ids) | Q(away_team_id__in=group_ids)
+        )
+        .filter(status=MatchStatus.FINISHED, kickoff__lt=before)
+        .select_related("stats", "odds")
+        .order_by("-kickoff")[:limit]
+    )
+
+
+def _team_stat_avg(group_ids, matches, home_attr, away_attr):
+    """Average a per-team MatchStats attribute over matches where it's present."""
+    vals = []
+    for m in matches:
+        stats = getattr(m, "stats", None)
+        if stats is None:
+            continue
+        is_home = m.home_team_id in group_ids
+        v = getattr(stats, home_attr if is_home else away_attr)
+        if v is not None:
+            vals.append(v)
+    return round(sum(vals) / len(vals), 3) if vals else 0.0
+
+
+def _market_strength(group_ids, matches):
+    """Mean bookmaker-implied win probability for the team over recent matches."""
+    probs = []
+    for m in matches:
+        odds = getattr(m, "odds", None)
+        if odds is None:
+            continue
+        implied = odds.implied_probabilities
+        if not implied:
+            continue
+        is_home = m.home_team_id in group_ids
+        probs.append(implied["home"] if is_home else implied["away"])
+    return round(sum(probs) / len(probs), 4) if probs else 0.0
+
+
+def get_features_v3(match_id: int) -> dict:
+    """Phase 3 feature dict: v2 features plus market strength and rolling
+    possession / shots / corners from the acquired stats + odds."""
+    match = Match.objects.select_related(
+        "home_team", "away_team", "league"
+    ).get(pk=match_id)
+    home, away, before = match.home_team, match.away_team, match.kickoff
+    home_ids = home.canonical_group_ids()
+    away_ids = away.canonical_group_ids()
+
+    features = get_features_v2(match_id)
+    hr = _recent_with_data(home_ids, before)
+    ar = _recent_with_data(away_ids, before)
+
+    features.update(
+        {
+            "home_market_strength": _market_strength(home_ids, hr),
+            "away_market_strength": _market_strength(away_ids, ar),
+            "home_shots_avg": _team_stat_avg(home_ids, hr, "home_shots", "away_shots"),
+            "away_shots_avg": _team_stat_avg(away_ids, ar, "home_shots", "away_shots"),
+            "home_possession_avg": _team_stat_avg(home_ids, hr, "home_possession", "away_possession"),
+            "away_possession_avg": _team_stat_avg(away_ids, ar, "home_possession", "away_possession"),
+            "home_corners_avg": _team_stat_avg(home_ids, hr, "home_corners", "away_corners"),
+            "away_corners_avg": _team_stat_avg(away_ids, ar, "home_corners", "away_corners"),
+        }
+    )
+    return features
+
+
 def features_to_vector(features: dict, order=FEATURE_ORDER) -> list:
     """Flatten a feature dict into an ordered vector for the model."""
     return [features[name] for name in order]
@@ -236,6 +322,7 @@ def features_to_vector(features: dict, order=FEATURE_ORDER) -> list:
 FEATURE_SETS = {
     "v1": (get_features, FEATURE_ORDER),
     "v2": (get_features_v2, FEATURE_ORDER_V2),
+    "v3": (get_features_v3, FEATURE_ORDER_V3),
 }
 
 

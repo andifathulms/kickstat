@@ -5,7 +5,7 @@ from django.conf import settings
 from .features import FEATURE_SETS, features_to_vector
 
 # Preference order when resolving which serialized model to serve.
-MODEL_PREFERENCE = ["v2_xgboost", "v1_logistic"]
+MODEL_PREFERENCE = ["v3_xgboost", "v2_xgboost", "v1_logistic"]
 
 _cache = {}
 

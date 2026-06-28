@@ -15,9 +15,9 @@ class Command(BaseCommand):
         # NB: --version is reserved by Django's base command, so use --variant.
         parser.add_argument(
             "--variant",
-            default="v2",
+            default="v3",
             choices=list(MODELS),
-            help="Model variant to train (default: v2 / XGBoost).",
+            help="Model variant to train (default: v3 / XGBoost with odds + rich stats).",
         )
 
     def handle(self, *args, **options):

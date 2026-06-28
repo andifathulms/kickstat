@@ -131,4 +131,4 @@ CORS_ALLOW_ALL_ORIGINS = True
 # ML
 ML_MODELS_DIR = BASE_DIR / "ml" / "models"
 # Preferred model file stem for inference; falls back if it isn't trained yet.
-ML_ACTIVE_MODEL = os.getenv("ML_ACTIVE_MODEL", "v2_xgboost")
+ML_ACTIVE_MODEL = os.getenv("ML_ACTIVE_MODEL", "v3_xgboost")

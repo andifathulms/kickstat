@@ -24,6 +24,7 @@ from .features import FEATURE_SETS, features_to_vector, label_for
 MODELS = {
     "v1": ("v1", "v1_logistic"),
     "v2": ("v2", "v2_xgboost"),
+    "v3": ("v3", "v3_xgboost"),
 }
 
 

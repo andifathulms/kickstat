@@ -11,7 +11,7 @@ from ml import evaluate, features, predict, train
 
 def clean_models():
     """Remove any serialized models written during a test and reset the cache."""
-    for stem in ("v1_logistic", "v2_xgboost"):
+    for stem in ("v1_logistic", "v2_xgboost", "v3_xgboost"):
         path = predict._model_path(stem)
         if path.exists():
             path.unlink()
@@ -83,6 +83,48 @@ class FeatureTests(TestCase):
         feats = features.get_features_v2(self.upcoming.id)
         vector = features.features_to_vector(feats, features.FEATURE_ORDER_V2)
         self.assertEqual(len(vector), len(features.FEATURE_ORDER_V2))
+
+    def test_v3_feature_schema_extends_v2(self):
+        feats = features.get_features_v3(self.upcoming.id)
+        self.assertEqual(set(feats.keys()), set(features.FEATURE_ORDER_V3))
+        self.assertTrue(set(features.FEATURE_ORDER_V2).issubset(feats.keys()))
+        for key in (
+            "home_market_strength",
+            "away_market_strength",
+            "home_shots_avg",
+            "home_possession_avg",
+            "home_corners_avg",
+        ):
+            self.assertIn(key, feats)
+
+
+class MarketStrengthFeatureTests(TestCase):
+    def setUp(self):
+        from apps.matches.models import MatchOdds
+
+        self.league = make_league()
+        self.home = make_team(self.league, name="Strong", external_id="h")
+        self.away = make_team(self.league, name="Weak", external_id="a")
+        # Two past matches where the market rated Strong as a heavy home favourite.
+        for i in range(2):
+            m = make_match(
+                self.league, self.home, self.away, external_id=f"p{i}",
+                status=MatchStatus.FINISHED, home_score=2, away_score=0,
+                kickoff=timezone.now() - timedelta(days=10 + i),
+            )
+            MatchOdds.objects.create(
+                match=m, home_odds=1.25, draw_odds=6.0, away_odds=12.0
+            )
+        self.upcoming = make_match(
+            self.league, self.home, self.away, external_id="up",
+            status=MatchStatus.SCHEDULED, kickoff=timezone.now() + timedelta(days=1),
+        )
+
+    def test_market_strength_reflects_recent_odds(self):
+        feats = features.get_features_v3(self.upcoming.id)
+        # Strong team's implied win prob from 1.25 odds (de-vigged) is high.
+        self.assertGreater(feats["home_market_strength"], 0.7)
+        self.assertLess(feats["away_market_strength"], 0.15)
 
 
 class TrainPredictEvaluateTests(TestCase):
@@ -170,3 +212,19 @@ class XGBoostModelTests(TestCase):
         train.train("v1")
         train.train("v2")
         self.assertTrue(str(predict.resolve_model_path()).endswith("v2_xgboost.pkl"))
+
+    def test_train_and_predict_v3(self):
+        train.train("v3")
+        upcoming = make_match(
+            self.league, self.teams[0], self.teams[1], external_id="up3",
+            status=MatchStatus.SCHEDULED, kickoff=timezone.now() + timedelta(days=1),
+        )
+        result = predict.predict_match(upcoming.id)
+        self.assertEqual(result["model_version"], "v3_xgboost")
+        total = result["home_win_prob"] + result["draw_prob"] + result["away_win_prob"]
+        self.assertAlmostEqual(total, 1.0, places=2)
+
+    def test_v3_preferred_when_present(self):
+        train.train("v2")
+        train.train("v3")
+        self.assertTrue(str(predict.resolve_model_path()).endswith("v3_xgboost.pkl"))
