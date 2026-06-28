@@ -27,8 +27,12 @@ class Command(BaseCommand):
     def handle(self, *args, **options):
         dry = options["dry_run"]
 
+        # Historical club-data leagues (football-data.co.uk + Understat). Exclude
+        # StatsBomb, whose competitions include national teams that would
+        # false-match domestic clubs.
         hist_teams = (
-            Team.objects.filter(league__external_id__startswith="fduk-")
+            Team.objects.filter(league__is_active=False)
+            .exclude(league__external_id__startswith="sb-")
             .select_related("league")
         )
         by_country = defaultdict(list)
