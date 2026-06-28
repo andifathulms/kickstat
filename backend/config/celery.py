@@ -43,6 +43,10 @@ app.conf.beat_schedule = {
         "task": "apps.predictions.tasks.run_daily_predictions",
         "schedule": crontab(hour=8, minute=0),
     },
+    "run-score-predictions": {
+        "task": "apps.predictions.tasks.run_score_predictions",
+        "schedule": crontab(hour=8, minute=5),
+    },
     "evaluate-predictions": {
         "task": "apps.predictions.tasks.evaluate_predictions",
         "schedule": crontab(hour=0, minute=0),

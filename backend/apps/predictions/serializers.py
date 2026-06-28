@@ -1,6 +1,25 @@
 from rest_framework import serializers
 
-from .models import MatchPrediction
+from .models import MatchPrediction, MatchScorePrediction
+
+
+class MatchScorePredictionSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = MatchScorePrediction
+        fields = (
+            "lambda_home",
+            "lambda_away",
+            "most_likely_home",
+            "most_likely_away",
+            "most_likely_prob",
+            "home_win_prob",
+            "draw_prob",
+            "away_win_prob",
+            "over25_prob",
+            "btts_prob",
+            "top_scores",
+            "model_version",
+        )
 
 
 class MatchPredictionSerializer(serializers.ModelSerializer):

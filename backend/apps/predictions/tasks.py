@@ -10,7 +10,7 @@ from django.utils import timezone
 
 from apps.matches.models import Match, MatchStatus
 
-from .models import MatchPrediction
+from .models import MatchPrediction, MatchScorePrediction
 
 logger = logging.getLogger(__name__)
 
@@ -67,3 +67,36 @@ def evaluate_predictions(self):
         accuracy_by_version(),
     )
     return {"scored": scored, "correct": correct}
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def run_score_predictions(self):
+    """Generate Poisson scoreline predictions for today's upcoming fixtures."""
+    from ml.poisson import league_baseline, predict_scoreline
+
+    today = timezone.now().date()
+    fixtures = Match.objects.filter(
+        kickoff__date=today,
+        status__in=[MatchStatus.SCHEDULED, MatchStatus.LIVE],
+    )
+    baseline = league_baseline(refresh=True)  # compute once for the batch
+
+    created = updated = skipped = 0
+    for match in fixtures:
+        try:
+            result = predict_scoreline(match.id, baseline=baseline)
+        except Exception as exc:  # noqa: BLE001
+            logger.warning("Scoreline failed for match %s: %s", match.id, exc)
+            skipped += 1
+            continue
+        _, was_created = MatchScorePrediction.objects.update_or_create(
+            match=match, defaults=result
+        )
+        created += int(was_created)
+        updated += int(not was_created)
+
+    logger.info(
+        "run_score_predictions: created=%s updated=%s skipped=%s",
+        created, updated, skipped,
+    )
+    return {"created": created, "updated": updated, "skipped": skipped}

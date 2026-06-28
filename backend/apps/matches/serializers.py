@@ -82,6 +82,7 @@ class MatchDetailSerializer(MatchListSerializer):
     odds = MatchOddsSerializer(read_only=True)
     events = MatchEventSerializer(many=True, read_only=True)
     prediction = serializers.SerializerMethodField()
+    score_prediction = serializers.SerializerMethodField()
 
     class Meta(MatchListSerializer.Meta):
         fields = (
@@ -100,6 +101,7 @@ class MatchDetailSerializer(MatchListSerializer):
             "odds",
             "events",
             "prediction",
+            "score_prediction",
         )
 
     def get_prediction(self, obj):
@@ -110,3 +112,11 @@ class MatchDetailSerializer(MatchListSerializer):
         if prediction is None:
             return None
         return MatchPredictionSerializer(prediction).data
+
+    def get_score_prediction(self, obj):
+        from apps.predictions.serializers import MatchScorePredictionSerializer
+
+        sp = getattr(obj, "score_prediction", None)
+        if sp is None:
+            return None
+        return MatchScorePredictionSerializer(sp).data

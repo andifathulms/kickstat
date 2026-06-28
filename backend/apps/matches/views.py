@@ -28,7 +28,7 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
         )
         if self.action == "retrieve":
             qs = qs.select_related("stats", "odds").prefetch_related(
-                "events__team", "events__player", "prediction"
+                "events__team", "events__player", "prediction", "score_prediction"
             )
         elif self._wants_stats():
             qs = qs.select_related("stats", "odds")

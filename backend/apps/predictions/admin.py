@@ -2,7 +2,7 @@ from django.contrib import admin, messages
 
 from ml.evaluate import accuracy_report, evaluate_unscored
 
-from .models import MatchPrediction
+from .models import MatchPrediction, MatchScorePrediction
 
 
 @admin.register(MatchPrediction)
@@ -37,3 +37,20 @@ class MatchPredictionAdmin(admin.ModelAdmin):
             f"Evaluated {scored} finished prediction(s); {correct} correct.",
             level=messages.SUCCESS,
         )
+
+
+@admin.register(MatchScorePrediction)
+class MatchScorePredictionAdmin(admin.ModelAdmin):
+    list_display = (
+        "match",
+        "most_likely_home",
+        "most_likely_away",
+        "lambda_home",
+        "lambda_away",
+        "over25_prob",
+        "btts_prob",
+        "model_version",
+    )
+    list_filter = ("model_version",)
+    search_fields = ("match__home_team__name", "match__away_team__name")
+    autocomplete_fields = ("match",)
