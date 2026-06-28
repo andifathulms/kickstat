@@ -17,13 +17,30 @@ from .serializers import (
 )
 
 
+# Season boundary: a football season starting in `year` runs Aug–Jul. August
+# (not July) so the COVID-extended 2019/20 season — which finished in July
+# 2020 — stays in 2019/20 rather than leaking into 2020/21. Suits the Aug–May
+# European leagues we hold history for.
+SEASON_CUTOFF_MONTH = 8
+
+
+def season_of(year: int, month: int) -> int:
+    return year if month >= SEASON_CUTOFF_MONTH else year - 1
+
+
 def _season_bounds(year: int) -> tuple[datetime.date, datetime.date]:
-    """UTC date window for a football season starting in `year` (Jul–Jun)."""
-    return datetime.date(year, 7, 1), datetime.date(year + 1, 6, 30)
+    """UTC date window for a football season starting in `year` (Aug–Jul)."""
+    return datetime.date(year, 8, 1), datetime.date(year + 1, 7, 31)
 
 
-def _compute_standings(league: League, season: str, date_from, date_to) -> list[dict]:
-    """Derive a league table from finished matches in a date window."""
+def _compute_standings(
+    league: League, season: str, date_from, date_to, venue: str = "overall"
+) -> list[dict]:
+    """Derive a league table from finished matches in a date window.
+
+    venue: "overall" (default), "home" (each team's home matches only) or
+    "away" (away matches only).
+    """
     matches = Match.objects.filter(
         league=league,
         status=MatchStatus.FINISHED,
@@ -49,28 +66,26 @@ def _compute_standings(league: League, season: str, date_from, date_to) -> list[
             }
         return table[team.id]
 
-    for m in matches:
-        home, away = row(m.home_team), row(m.away_team)
-        hs, as_ = m.home_score, m.away_score
-        home["played"] += 1
-        away["played"] += 1
-        home["goals_for"] += hs
-        home["goals_against"] += as_
-        away["goals_for"] += as_
-        away["goals_against"] += hs
-        if hs > as_:
-            home["won"] += 1
-            home["points"] += 3
-            away["lost"] += 1
-        elif hs < as_:
-            away["won"] += 1
-            away["points"] += 3
-            home["lost"] += 1
+    def credit(team, gf, ga):
+        r = row(team)
+        r["played"] += 1
+        r["goals_for"] += gf
+        r["goals_against"] += ga
+        if gf > ga:
+            r["won"] += 1
+            r["points"] += 3
+        elif gf < ga:
+            r["lost"] += 1
         else:
-            home["drawn"] += 1
-            away["drawn"] += 1
-            home["points"] += 1
-            away["points"] += 1
+            r["drawn"] += 1
+            r["points"] += 1
+
+    for m in matches:
+        hs, as_ = m.home_score, m.away_score
+        if venue in ("overall", "home"):
+            credit(m.home_team, hs, as_)
+        if venue in ("overall", "away"):
+            credit(m.away_team, as_, hs)
 
     rows = list(table.values())
     for r in rows:
@@ -165,7 +180,7 @@ class LeagueViewSet(viewsets.ReadOnlyModelViewSet):
         )
         counts: dict[int, int] = {}
         for g in grouped:
-            season = g["y"] if g["mo"] >= 7 else g["y"] - 1
+            season = season_of(g["y"], g["mo"])
             counts[season] = counts.get(season, 0) + g["c"]
         data = [
             {"season": str(s), "match_count": counts[s]}
@@ -177,23 +192,29 @@ class LeagueViewSet(viewsets.ReadOnlyModelViewSet):
     def standings(self, request, pk=None):
         league = self.get_object()
         season = request.query_params.get("season")
+        venue = request.query_params.get("venue", "overall")
+        if venue not in ("overall", "home", "away"):
+            venue = "overall"
 
         if season:
-            stored = list(
-                Standing.objects.filter(league=league, season=season)
-                .select_related("team")
-                .order_by("position")
-            )
-            # Use stored rows only when they carry real data (a live/synced
-            # table); otherwise compute the table from that season's matches.
-            if stored and any(s.played > 0 for s in stored):
-                return Response(StandingSerializer(stored, many=True).data)
+            # Home/away splits aren't carried in stored standings, so always
+            # compute them. For overall, prefer real stored rows when present.
+            if venue == "overall":
+                stored = list(
+                    Standing.objects.filter(league=league, season=season)
+                    .select_related("team")
+                    .order_by("position")
+                )
+                if stored and any(s.played > 0 for s in stored):
+                    return Response(StandingSerializer(stored, many=True).data)
             try:
                 year = int(season)
             except ValueError:
                 return Response([])
             date_from, date_to = _season_bounds(year)
-            return Response(_compute_standings(league, season, date_from, date_to))
+            return Response(
+                _compute_standings(league, season, date_from, date_to, venue)
+            )
 
         qs = (
             Standing.objects.filter(league=league)

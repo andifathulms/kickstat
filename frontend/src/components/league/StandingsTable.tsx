@@ -2,11 +2,18 @@ import Link from "next/link";
 import type { Standing } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
-const COLS: { key: keyof Standing; label: string; em?: boolean }[] = [
+const COLS: {
+  key: keyof Standing;
+  label: string;
+  em?: boolean;
+  hideSm?: boolean;
+}[] = [
   { key: "played", label: "P" },
   { key: "won", label: "W" },
   { key: "drawn", label: "D" },
   { key: "lost", label: "L" },
+  { key: "goals_for", label: "GF", hideSm: true },
+  { key: "goals_against", label: "GA", hideSm: true },
   { key: "goal_difference", label: "GD" },
   { key: "points", label: "Pts", em: true },
 ];
@@ -21,8 +28,10 @@ function zoneClass(position: number, total: number): string {
 
 export default function StandingsTable({
   standings,
+  showZones = true,
 }: {
   standings: Standing[];
+  showZones?: boolean;
 }) {
   const total = standings.length;
   return (
@@ -37,7 +46,13 @@ export default function StandingsTable({
               <span className="stat-label">Team</span>
             </th>
             {COLS.map((c) => (
-              <th key={c.label} className="w-10 py-3 px-2 text-right">
+              <th
+                key={c.label}
+                className={cn(
+                  "w-10 py-3 px-2 text-right",
+                  c.hideSm && "hidden sm:table-cell"
+                )}
+              >
                 <span className="stat-label">{c.label}</span>
               </th>
             ))}
@@ -53,7 +68,7 @@ export default function StandingsTable({
                 className={cn(
                   "relative py-2.5 pl-4 pr-2 font-mono text-text-secondary",
                   "before:absolute before:left-0 before:top-1.5 before:bottom-1.5 before:w-0.5 before:rounded-full",
-                  zoneClass(s.position, total)
+                  showZones ? zoneClass(s.position, total) : "before:bg-transparent"
                 )}
               >
                 {s.position}
@@ -81,6 +96,7 @@ export default function StandingsTable({
                   key={c.label}
                   className={cn(
                     "py-2.5 px-2 text-right font-mono tabular-nums",
+                    c.hideSm && "hidden sm:table-cell",
                     c.em
                       ? "font-semibold text-text-primary"
                       : "text-text-secondary"

@@ -14,12 +14,15 @@ import {
   competitionGroupOf,
   findHistoryLeague,
   buildSeasonOptions,
+  normalizeVenue,
   seasonDateRange,
   seasonLabel,
   type SeasonOption,
+  type Venue,
 } from "@/lib/competitions";
 import StandingsTable from "@/components/league/StandingsTable";
 import SeasonTabs from "@/components/league/SeasonTabs";
+import VenueTabs from "@/components/league/VenueTabs";
 import MatchList from "@/components/match/MatchList";
 import HistoryMatchRow from "@/components/match/HistoryMatchRow";
 import SectionHeader from "@/components/ui/SectionHeader";
@@ -34,7 +37,7 @@ export default async function LeaguePage({
   searchParams,
 }: {
   params: { slug: string };
-  searchParams: { season?: string; page?: string };
+  searchParams: { season?: string; page?: string; venue?: string };
 }) {
   let league;
   try {
@@ -64,6 +67,7 @@ export default async function LeaguePage({
 
   const group = COMPETITION_GROUPS[competitionGroupOf(league)];
   const page = Math.max(1, Number(searchParams.page) || 1);
+  const venue = normalizeVenue(searchParams.venue);
 
   return (
     <div className="space-y-8">
@@ -115,12 +119,13 @@ export default async function LeaguePage({
           No match data is available for this competition yet.
         </p>
       ) : selected.isLive ? (
-        <LiveSeason slug={params.slug} season={selected} />
+        <LiveSeason slug={params.slug} season={selected} venue={venue} />
       ) : (
         <ArchivedSeason
           season={selected}
           page={page}
           slug={params.slug}
+          venue={venue}
         />
       )}
     </div>
@@ -131,19 +136,26 @@ export default async function LeaguePage({
 async function LiveSeason({
   slug,
   season,
+  venue,
 }: {
   slug: string;
   season: SeasonOption;
+  venue: Venue;
 }) {
   const [standings, fixtures, results] = await Promise.all([
-    getStandings(season.leagueId, season.value).catch(() => []),
+    getStandings(season.leagueId, season.value, venue).catch(() => []),
     getLeagueFixtures(slug).catch(() => null),
     getLeagueResults(slug).catch(() => null),
   ]);
 
   return (
     <>
-      <StandingsSection standings={standings} season={season} />
+      <StandingsSection
+        standings={standings}
+        season={season}
+        venue={venue}
+        slug={slug}
+      />
 
       <section>
         <SectionHeader eyebrow="Upcoming" title="Fixtures" />
@@ -171,14 +183,16 @@ async function ArchivedSeason({
   season,
   page,
   slug,
+  venue,
 }: {
   season: SeasonOption;
   page: number;
   slug: string;
+  venue: Venue;
 }) {
   const { dateFrom, dateTo } = seasonDateRange(season.value);
   const [standings, data] = await Promise.all([
-    getStandings(season.leagueId, season.value).catch(() => []),
+    getStandings(season.leagueId, season.value, venue).catch(() => []),
     getHistoryMatches({
       league: season.leagueId,
       page,
@@ -191,7 +205,12 @@ async function ArchivedSeason({
 
   return (
     <>
-      <StandingsSection standings={standings} season={season} />
+      <StandingsSection
+        standings={standings}
+        season={season}
+        venue={venue}
+        slug={slug}
+      />
 
       <section>
         <SectionHeader
@@ -249,19 +268,30 @@ async function ArchivedSeason({
 function StandingsSection({
   standings,
   season,
+  venue,
+  slug,
 }: {
   standings: Awaited<ReturnType<typeof getStandings>>;
   season: SeasonOption;
+  venue: Venue;
+  slug: string;
 }) {
   return (
     <section>
       <SectionHeader eyebrow="Table" title="Standings">
-        {standings.length > 0 && !season.isLive && (
-          <span className="chip">computed from results</span>
-        )}
+        <VenueTabs active={venue} slug={slug} season={season.value} />
       </SectionHeader>
       {standings.length > 0 ? (
-        <StandingsTable standings={standings} />
+        <>
+          <StandingsTable standings={standings} showZones={venue === "overall"} />
+          {(venue !== "overall" || standings[0]?.computed) && (
+            <p className="mt-2 text-xs text-text-muted">
+              {venue === "overall"
+                ? "Table computed from match results."
+                : `${venue === "home" ? "Home" : "Away"} record only — each team's ${venue} matches this season.`}
+            </p>
+          )}
+        </>
       ) : (
         <p className="card p-8 text-center text-sm text-text-secondary">
           No standings available for this season.

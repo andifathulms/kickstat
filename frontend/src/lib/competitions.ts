@@ -237,11 +237,27 @@ export function buildSeasonOptions(
   );
 }
 
-/** UTC date range (ISO yyyy-mm-dd) covering a single football season. */
+/**
+ * UTC date range (ISO yyyy-mm-dd) covering a single football season. Runs
+ * Aug–Jul to keep the COVID-extended 2019/20 season (which finished in July
+ * 2020) intact — mirrors SEASON_CUTOFF_MONTH on the backend.
+ */
 export function seasonDateRange(season: string): {
   dateFrom: string;
   dateTo: string;
 } {
   const y = parseInt(season, 10);
-  return { dateFrom: `${y}-07-01`, dateTo: `${y + 1}-06-30` };
+  return { dateFrom: `${y}-08-01`, dateTo: `${y + 1}-07-31` };
+}
+
+export type Venue = "overall" | "home" | "away";
+
+export const VENUES: { value: Venue; label: string }[] = [
+  { value: "overall", label: "Overall" },
+  { value: "home", label: "Home" },
+  { value: "away", label: "Away" },
+];
+
+export function normalizeVenue(value: string | undefined): Venue {
+  return value === "home" || value === "away" ? value : "overall";
 }

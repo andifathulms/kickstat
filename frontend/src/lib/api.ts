@@ -40,10 +40,17 @@ export const getLeagues = () =>
   get<Paginated<League>>("/leagues/?is_active=true");
 export const getLeague = (idOrSlug: string | number) =>
   get<League>(`/leagues/${idOrSlug}/`);
-export const getStandings = (idOrSlug: string | number, season?: string) =>
-  get<Standing[]>(
-    `/leagues/${idOrSlug}/standings/${season ? `?season=${season}` : ""}`
-  );
+export const getStandings = (
+  idOrSlug: string | number,
+  season?: string,
+  venue?: string
+) => {
+  const q = new URLSearchParams();
+  if (season) q.set("season", season);
+  if (venue && venue !== "overall") q.set("venue", venue);
+  const qs = q.toString();
+  return get<Standing[]>(`/leagues/${idOrSlug}/standings/${qs ? `?${qs}` : ""}`);
+};
 export const getLeagueSeasons = (idOrSlug: string | number) =>
   get<LeagueSeason[]>(`/leagues/${idOrSlug}/seasons/`, { revalidate: 600 });
 export const getLeagueFixtures = (idOrSlug: string | number) =>
