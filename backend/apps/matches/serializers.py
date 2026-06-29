@@ -2,7 +2,33 @@ from rest_framework import serializers
 
 from apps.leagues.serializers import LeagueSerializer, TeamMiniSerializer
 
-from .models import Match, MatchEvent, MatchLineup, MatchOdds, MatchStats
+from .models import (
+    Match,
+    MatchEvent,
+    MatchLineup,
+    MatchOdds,
+    MatchStats,
+    Referee,
+    Stadium,
+)
+
+
+class RefereeSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Referee
+        fields = ("id", "name", "country")
+
+
+class StadiumSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Stadium
+        fields = ("id", "name", "country")
+
+
+class CoachSerializer(serializers.Serializer):
+    id = serializers.IntegerField(read_only=True)
+    name = serializers.CharField(read_only=True)
+    nationality = serializers.CharField(read_only=True)
 
 
 class MatchStatsSerializer(serializers.ModelSerializer):
@@ -110,6 +136,10 @@ class MatchDetailSerializer(MatchListSerializer):
     """Full match payload: nested league, stats, events, odds, prediction."""
 
     league = LeagueSerializer(read_only=True)
+    referee = RefereeSerializer(read_only=True)
+    stadium = StadiumSerializer(read_only=True)
+    home_coach = CoachSerializer(read_only=True)
+    away_coach = CoachSerializer(read_only=True)
     stats = MatchStatsSerializer(read_only=True)
     odds = MatchOddsSerializer(read_only=True)
     events = MatchEventSerializer(many=True, read_only=True)
@@ -132,8 +162,8 @@ class MatchDetailSerializer(MatchListSerializer):
             "away_score",
             "referee",
             "stadium",
-            "home_manager",
-            "away_manager",
+            "home_coach",
+            "away_coach",
             "stats",
             "odds",
             "events",

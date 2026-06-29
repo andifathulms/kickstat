@@ -1,7 +1,31 @@
 from django.db import models
 
 from apps.common.models import BaseModel
-from apps.leagues.models import League, Player, Team
+from apps.leagues.models import Coach, League, Player, Team
+
+
+class Stadium(BaseModel):
+    name = models.CharField(max_length=160)
+    country = models.CharField(max_length=80, blank=True)
+    external_id = models.CharField(max_length=64, db_index=True, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
+class Referee(BaseModel):
+    name = models.CharField(max_length=120)
+    country = models.CharField(max_length=80, blank=True)
+    external_id = models.CharField(max_length=64, db_index=True, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
 
 
 class MatchStatus(models.TextChoices):
@@ -32,10 +56,22 @@ class Match(BaseModel):
     external_id = models.CharField(max_length=64, unique=True)
     raw_data = models.JSONField(default=dict, blank=True)
     # Match metadata (populated where the source provides it, e.g. StatsBomb)
-    referee = models.CharField(max_length=120, blank=True)
-    stadium = models.CharField(max_length=160, blank=True)
-    home_manager = models.CharField(max_length=120, blank=True)
-    away_manager = models.CharField(max_length=120, blank=True)
+    referee = models.ForeignKey(
+        Referee, related_name="matches", on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    stadium = models.ForeignKey(
+        Stadium, related_name="matches", on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    home_coach = models.ForeignKey(
+        Coach, related_name="home_matches", on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
+    away_coach = models.ForeignKey(
+        Coach, related_name="away_matches", on_delete=models.SET_NULL,
+        null=True, blank=True,
+    )
 
     class Meta:
         ordering = ["kickoff"]

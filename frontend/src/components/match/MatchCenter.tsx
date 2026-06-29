@@ -16,12 +16,29 @@ import MatchTimeline from "@/components/match/MatchTimeline";
 import Lineups from "@/components/match/Lineups";
 import TeamCard from "@/components/team/TeamCard";
 
-const TABS = ["Overview", "Stats", "Prediction", "Lineups"] as const;
-type Tab = (typeof TABS)[number];
+const ALL_TABS = ["Overview", "Stats", "Prediction", "Lineups"] as const;
+type Tab = (typeof ALL_TABS)[number];
 
 export default function MatchCenter({ match }: { match: MatchDetail }) {
-  const [tab, setTab] = useState<Tab>("Overview");
   const isLive = match.status === "LIVE";
+
+  // Only offer tabs that actually have something to show.
+  const hasEvents = match.events.length > 0;
+  const hasStats = !!match.stats;
+  const hasPrediction =
+    !!match.prediction || !!match.odds?.implied_probabilities || !!match.score_prediction;
+  const hasLineups = (match.lineups?.length ?? 0) > 0;
+  const available = ALL_TABS.filter((t) =>
+    t === "Overview"
+      ? hasEvents
+      : t === "Stats"
+        ? hasStats
+        : t === "Prediction"
+          ? hasPrediction
+          : hasLineups
+  );
+  const tabs = available.length > 0 ? available : (["Overview"] as Tab[]);
+  const [tab, setTab] = useState<Tab>(tabs[0]);
 
   return (
     <div className="space-y-5">
@@ -95,7 +112,7 @@ export default function MatchCenter({ match }: { match: MatchDetail }) {
 
       {/* Tabs */}
       <div className="flex gap-1 overflow-x-auto border-b border-border">
-        {TABS.map((t) => (
+        {tabs.map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}

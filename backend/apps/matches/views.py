@@ -27,7 +27,9 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
             "league", "home_team", "away_team"
         )
         if self.action == "retrieve":
-            qs = qs.select_related("stats", "odds").prefetch_related(
+            qs = qs.select_related(
+                "stats", "odds", "referee", "stadium", "home_coach", "away_coach"
+            ).prefetch_related(
                 "events__player",
                 "events__assist",
                 "lineups__player",

@@ -12,7 +12,7 @@ from datetime import datetime, timezone
 import requests
 from django.core.management.base import BaseCommand, CommandError
 
-from apps.leagues.models import League, Player, Source, Team
+from apps.leagues.models import Coach, League, Player, Source, Team
 from apps.matches.models import (
     EventType,
     Match,
@@ -20,6 +20,8 @@ from apps.matches.models import (
     MatchLineup,
     MatchStats,
     MatchStatus,
+    Referee,
+    Stadium,
 )
 
 RAW_BASE = "https://raw.githubusercontent.com/statsbomb/open-data/master/data"
@@ -351,6 +353,41 @@ class Command(BaseCommand):
         )
         return player
 
+    def _referee(self, ref):
+        if not ref or not ref.get("name"):
+            return None
+        obj, _ = Referee.objects.update_or_create(
+            external_id=f"sb-{ref['id']}" if ref.get("id") else "",
+            name=ref["name"],
+            defaults={"country": (ref.get("country") or {}).get("name", "")},
+        )
+        return obj
+
+    def _stadium(self, st):
+        if not st or not st.get("name"):
+            return None
+        obj, _ = Stadium.objects.update_or_create(
+            external_id=f"sb-{st['id']}" if st.get("id") else "",
+            name=st["name"],
+            defaults={"country": (st.get("country") or {}).get("name", "")},
+        )
+        return obj
+
+    def _coach(self, managers):
+        managers = managers or []
+        if not managers:
+            return None
+        m = managers[0]
+        obj, _ = Coach.objects.update_or_create(
+            external_id=f"sb-{m['id']}" if m.get("id") else "",
+            name=m.get("name", ""),
+            defaults={
+                "nationality": (m.get("country") or {}).get("name", ""),
+                "date_of_birth": m.get("dob") or None,
+            },
+        )
+        return obj
+
     def _ingest_match(self, sb_match, league):
         ext = f"sb-{sb_match['match_id']}"
         # Resumable: skip matches already enriched (lineups present) unless
@@ -374,10 +411,6 @@ class Command(BaseCommand):
             f"{sb_match['match_date']}T{sb_match.get('kick_off') or '00:00:00'}"
         ).replace(tzinfo=timezone.utc)
 
-        def manager(team_obj):
-            managers = team_obj.get("managers") or []
-            return managers[0]["name"] if managers else ""
-
         match, _ = Match.objects.update_or_create(
             external_id=ext,
             defaults={
@@ -389,10 +422,10 @@ class Command(BaseCommand):
                 "status": MatchStatus.FINISHED,
                 "home_score": sb_match.get("home_score"),
                 "away_score": sb_match.get("away_score"),
-                "referee": (sb_match.get("referee") or {}).get("name", ""),
-                "stadium": (sb_match.get("stadium") or {}).get("name", ""),
-                "home_manager": manager(home_obj),
-                "away_manager": manager(away_obj),
+                "referee": self._referee(sb_match.get("referee")),
+                "stadium": self._stadium(sb_match.get("stadium")),
+                "home_coach": self._coach(home_obj.get("managers")),
+                "away_coach": self._coach(away_obj.get("managers")),
                 "raw_data": sb_match,
             },
         )

@@ -95,6 +95,21 @@ class Player(BaseModel):
         return self.name
 
 
+class Coach(BaseModel):
+    """A manager / head coach. Sourced from StatsBomb match metadata."""
+
+    name = models.CharField(max_length=120)
+    nationality = models.CharField(max_length=80, blank=True)
+    date_of_birth = models.DateField(null=True, blank=True)
+    external_id = models.CharField(max_length=64, db_index=True, blank=True)
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        return self.name
+
+
 class Standing(BaseModel):
     league = models.ForeignKey(
         League, related_name="standings", on_delete=models.CASCADE

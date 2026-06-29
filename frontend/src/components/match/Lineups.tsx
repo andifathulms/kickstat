@@ -95,12 +95,12 @@ export default function Lineups({ match }: { match: MatchDetail }) {
       <div className="grid gap-4 md:grid-cols-2">
         <TeamColumn
           team={match.home_team}
-          manager={match.home_manager}
+          manager={match.home_coach?.name ?? ""}
           players={home}
         />
         <TeamColumn
           team={match.away_team}
-          manager={match.away_manager}
+          manager={match.away_coach?.name ?? ""}
           players={away}
         />
       </div>
@@ -109,13 +109,13 @@ export default function Lineups({ match }: { match: MatchDetail }) {
           {match.stadium && (
             <span>
               <span className="stat-label mr-2">Stadium</span>
-              {match.stadium}
+              {match.stadium.name}
             </span>
           )}
           {match.referee && (
             <span>
               <span className="stat-label mr-2">Referee</span>
-              {match.referee}
+              {match.referee.name}
             </span>
           )}
         </div>

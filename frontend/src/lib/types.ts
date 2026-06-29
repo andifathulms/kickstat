@@ -156,12 +156,19 @@ export interface ScorePrediction {
   model_version: string;
 }
 
+export interface NamedEntity {
+  id: number;
+  name: string;
+  country?: string;
+  nationality?: string;
+}
+
 export interface MatchDetail extends Omit<MatchListItem, "league"> {
   league: League;
-  referee: string;
-  stadium: string;
-  home_manager: string;
-  away_manager: string;
+  referee: NamedEntity | null;
+  stadium: NamedEntity | null;
+  home_coach: NamedEntity | null;
+  away_coach: NamedEntity | null;
   stats: MatchStats | null;
   odds: MatchOdds | null;
   events: MatchEvent[];
