@@ -66,15 +66,27 @@ def _apply_card(side, name):
         side["red"] += 1
 
 
-def compute_match_stats(events, home_name, away_name):
+def compute_match_stats(events, home_name, away_name, home_id=None, away_id=None):
     """Derive a full per-team stat line from a StatsBomb events list.
 
     Returns a dict of MatchStats field values plus an ``extra`` dict carrying the
     long tail of metrics (passes, pass accuracy, crosses, throw-ins, offsides,
     tackles, interceptions, blocks, clearances, dribbles, recoveries, duels,
     saves, …) so nothing is dropped. Pure — no DB or network.
+
+    Teams are matched by StatsBomb team_id when ``home_id``/``away_id`` are given
+    (names differ between matches.json and events.json for some competitions),
+    falling back to team name otherwise.
     """
-    side_of = {home_name: "home", away_name: "away"}
+    side_of_name = {home_name: "home", away_name: "away"}
+    side_of_id = {}
+    if home_id is not None:
+        side_of_id[home_id] = "home"
+    if away_id is not None:
+        side_of_id[away_id] = "away"
+
+    def side_of(team):
+        return side_of_id.get(team.get("id")) or side_of_name.get(team.get("name"))
 
     def new_side():
         return {
@@ -91,7 +103,7 @@ def compute_match_stats(events, home_name, away_name):
     agg = {"home": new_side(), "away": new_side()}
 
     for e in events:
-        side = side_of.get((e.get("team") or {}).get("name"))
+        side = side_of(e.get("team") or {})
         if side is None:
             continue
         a = agg[side]
@@ -386,25 +398,33 @@ class Command(BaseCommand):
         )
 
         events = _get(f"{RAW_BASE}/events/{match_id}.json")
-        stats = compute_match_stats(events, home.name, away.name)
+        stats = compute_match_stats(
+            events,
+            home.name,
+            away.name,
+            home_obj["home_team_id"],
+            away_obj["away_team_id"],
+        )
         MatchStats.objects.update_or_create(match=match, defaults=stats)
 
         # Lineups + timeline are rebuilt from scratch each run (no natural key).
-        team_by_name = {home.name: home, away.name: away}
+        # Resolve teams by StatsBomb team_id — names differ between files for
+        # some competitions (e.g. "Aston Villa W" vs "Aston Villa").
+        team_by_sb = {home.external_id: home, away.external_id: away}
         match.lineups.all().delete()
         match.events.all().delete()
         try:
             lineups = _get(f"{RAW_BASE}/lineups/{match_id}.json")
-            self._store_lineups(match, lineups, team_by_name)
+            self._store_lineups(match, lineups, team_by_sb)
         except requests.HTTPError:
             lineups = []
-        self._store_timeline(match, events, team_by_name)
+        self._store_timeline(match, events, team_by_sb)
         return 1
 
-    def _store_lineups(self, match, lineups, team_by_name):
+    def _store_lineups(self, match, lineups, team_by_sb):
         rows = []
         for team_block in lineups:
-            team = team_by_name.get(team_block.get("team_name"))
+            team = team_by_sb.get(f"sb-{team_block.get('team_id')}")
             if team is None:
                 continue
             for p in team_block.get("lineup", []):
@@ -441,12 +461,12 @@ class Command(BaseCommand):
                 )
         MatchLineup.objects.bulk_create(rows)
 
-    def _store_timeline(self, match, events, team_by_name):
+    def _store_timeline(self, match, events, team_by_sb):
         by_id = {e.get("id"): e for e in events}
         rows = []
 
         def team_of(e):
-            return team_by_name.get((e.get("team") or {}).get("name"))
+            return team_by_sb.get(f"sb-{(e.get('team') or {}).get('id')}")
 
         def player_of(e, team):
             pl = e.get("player") or {}
