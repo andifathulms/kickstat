@@ -144,7 +144,7 @@ function Stats({ match }: { match: MatchDetail }) {
       </p>
     );
   }
-  const extra = s.extra;
+  const extra = s.extra?.home && s.extra?.away ? s.extra : null;
   return (
     <div className="space-y-4">
       <div className="card p-5 space-y-4">
