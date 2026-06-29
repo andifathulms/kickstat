@@ -2,6 +2,7 @@ import Link from "next/link";
 import type { MatchListItem } from "@/lib/types";
 import MatchList from "@/components/match/MatchList";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Avatar from "@/components/ui/Avatar";
 
 export interface ProfileStat {
   label: string;
@@ -19,6 +20,7 @@ export default function EntityProfile({
   matchesTitle = "Matches",
   emptyText = "No matches found.",
   crumb,
+  imageUrl,
 }: {
   eyebrow: string;
   title: string;
@@ -28,6 +30,7 @@ export default function EntityProfile({
   matchesTitle?: string;
   emptyText?: string;
   crumb?: { href: string; label: string };
+  imageUrl?: string | null;
 }) {
   return (
     <div className="space-y-8">
@@ -49,12 +52,19 @@ export default function EntityProfile({
 
       <header className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6">
         <div className="pointer-events-none absolute inset-0 bg-accent-sheen opacity-60" />
-        <div className="relative">
-          <span className="stat-label text-accent/90">{eyebrow}</span>
-          <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
-          {subtitle && (
-            <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
-          )}
+        <div className="relative flex items-start gap-4">
+          <Avatar
+            name={title}
+            src={imageUrl}
+            contain={!!imageUrl}
+            className="h-16 w-16 text-lg"
+          />
+          <div className="min-w-0">
+            <span className="stat-label text-accent/90">{eyebrow}</span>
+            <h1 className="text-2xl font-semibold tracking-tight">{title}</h1>
+            {subtitle && (
+              <p className="mt-1 text-sm text-text-secondary">{subtitle}</p>
+            )}
           {stats && stats.length > 0 && (
             <div className="mt-5 flex flex-wrap gap-2.5">
               {stats.map((s) => (
@@ -74,6 +84,7 @@ export default function EntityProfile({
               ))}
             </div>
           )}
+          </div>
         </div>
       </header>
 

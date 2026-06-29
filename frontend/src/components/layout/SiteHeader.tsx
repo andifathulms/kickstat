@@ -1,11 +1,12 @@
 "use client";
 
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import type { GroupedLeagues } from "@/lib/competitions";
 import { cn } from "@/lib/utils";
 import CompetitionBadge from "@/components/ui/CompetitionBadge";
+import SearchBox from "@/components/layout/SearchBox";
 
 const LINKS = [
   { href: "/", label: "Home" },
@@ -15,16 +16,8 @@ const LINKS = [
 
 export default function SiteHeader({ groups }: { groups: GroupedLeagues[] }) {
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [query, setQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
-
-  const submitSearch = (e: React.FormEvent) => {
-    e.preventDefault();
-    const q = query.trim();
-    if (q.length >= 2) router.push(`/search?q=${encodeURIComponent(q)}`);
-  };
 
   // close the mega-menu on route change or outside click
   useEffect(() => setOpen(false), [pathname]);
@@ -139,20 +132,9 @@ export default function SiteHeader({ groups }: { groups: GroupedLeagues[] }) {
         </div>
 
         {/* Search */}
-        <form onSubmit={submitSearch} className="hidden md:block">
-          <div className="flex items-center gap-2 rounded-lg border border-border bg-surface-raised px-3 py-1.5 focus-within:border-border-strong">
-            <svg className="h-3.5 w-3.5 text-text-muted" viewBox="0 0 16 16" fill="none">
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-              <path d="M11 11l3 3" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search players, teams…"
-              className="w-44 bg-transparent text-sm text-text-primary placeholder:text-text-muted focus:outline-none"
-            />
-          </div>
-        </form>
+        <div className="hidden md:block">
+          <SearchBox />
+        </div>
 
         {/* Mobile: condensed links */}
         <nav className="flex items-center gap-3 text-sm text-text-secondary md:hidden">
