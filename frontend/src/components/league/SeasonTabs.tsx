@@ -30,17 +30,32 @@ export default function SeasonTabs({
               "pill font-mono text-xs",
               s.value === active ? "pill-active" : "pill-idle"
             )}
-            title={s.isLive ? "Live season" : `${s.matchCount} matches`}
+            title={
+              s.rich
+                ? `${s.matchCount} matches · full data (lineups, goals & assists)`
+                : s.isLive
+                  ? "Live season"
+                  : `${s.matchCount} matches`
+            }
           >
             {s.label}
-            {s.isLive && (
+            {s.rich ? (
+              <span
+                className={cn(
+                  "ml-0.5 text-[10px]",
+                  s.value === active ? "text-accent-ink" : "text-accent"
+                )}
+              >
+                ✦
+              </span>
+            ) : s.isLive ? (
               <span
                 className={cn(
                   "ml-1 h-1.5 w-1.5 rounded-full",
                   s.value === active ? "bg-accent-ink" : "bg-grass-green"
                 )}
               />
-            )}
+            ) : null}
           </Link>
         ))}
       </div>

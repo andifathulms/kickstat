@@ -186,6 +186,27 @@ export function findHistoryLeague(
   );
 }
 
+/**
+ * Find the `(StatsBomb …)` archive rows for a competition — these carry the
+ * rich data (lineups, goals+assists, full stats). One row per season.
+ */
+export function findStatsBombLeagues(
+  active: { name: string; country: string },
+  archive: ArchiveLeague[]
+): ArchiveLeague[] {
+  const target =
+    HISTORY_NAME_ALIAS[active.name.toLowerCase()] ?? baseName(active.name);
+  const country = (active.country || "").toLowerCase();
+  return archive.filter(
+    (a) =>
+      a.name.toLowerCase().includes("(statsbomb") &&
+      baseName(a.name) === target &&
+      (a.country || "").toLowerCase() === country
+  );
+}
+
+export type SeasonSourceKind = "live" | "statsbomb" | "history";
+
 export interface SeasonOption {
   /** season-start year as a string, e.g. "2024" */
   value: string;
@@ -195,46 +216,56 @@ export interface SeasonOption {
   /** which league row holds this season's data */
   leagueId: number;
   matchCount: number;
+  source: SeasonSourceKind;
+  /** rich = full lineups, goals+assists, detailed stats (StatsBomb) */
+  rich: boolean;
 }
 
-/**
- * Merge the real seasons (those that actually have matches) of the active
- * competition and its archived `(history)` counterpart into one list, newest
- * first. Live seasons win over archived ones for the same year.
- */
-export function buildSeasonOptions(
-  active: League,
-  activeSeasons: LeagueSeason[],
-  history: ArchiveLeague | null,
-  historySeasons: LeagueSeason[]
-): SeasonOption[] {
-  const byValue = new Map<string, SeasonOption>();
+export interface SeasonSource {
+  leagueId: number;
+  seasons: LeagueSeason[];
+  kind: SeasonSourceKind;
+}
 
-  for (const s of activeSeasons) {
-    byValue.set(s.season, {
-      value: s.season,
-      label: seasonLabel(s.season),
-      isLive: true,
-      leagueId: active.id,
-      matchCount: s.match_count,
-    });
-  }
-  if (history) {
-    for (const s of historySeasons) {
-      if (byValue.has(s.season)) continue;
+// Higher wins when the same season exists in multiple sources. StatsBomb beats
+// the football-data history because it carries lineups + richer stats.
+const SOURCE_PRIORITY: Record<SeasonSourceKind, number> = {
+  live: 3,
+  statsbomb: 2,
+  history: 1,
+};
+
+/**
+ * Merge seasons (those that actually have matches) from every source for a
+ * competition — the live row, its StatsBomb season rows, and the football-data
+ * `(history)` row — into one list, newest first.
+ */
+export function mergeSeasonSources(sources: SeasonSource[]): SeasonOption[] {
+  const byValue = new Map<string, { opt: SeasonOption; priority: number }>();
+
+  for (const src of sources) {
+    const priority = SOURCE_PRIORITY[src.kind];
+    for (const s of src.seasons) {
+      const existing = byValue.get(s.season);
+      if (existing && existing.priority >= priority) continue;
       byValue.set(s.season, {
-        value: s.season,
-        label: seasonLabel(s.season),
-        isLive: false,
-        leagueId: history.id,
-        matchCount: s.match_count,
+        priority,
+        opt: {
+          value: s.season,
+          label: seasonLabel(s.season),
+          isLive: src.kind === "live",
+          leagueId: src.leagueId,
+          matchCount: s.match_count,
+          source: src.kind,
+          rich: src.kind === "statsbomb",
+        },
       });
     }
   }
 
-  return Array.from(byValue.values()).sort((a, b) =>
-    b.value.localeCompare(a.value)
-  );
+  return Array.from(byValue.values())
+    .map((v) => v.opt)
+    .sort((a, b) => b.value.localeCompare(a.value));
 }
 
 /**

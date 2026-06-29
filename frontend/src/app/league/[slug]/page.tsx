@@ -13,11 +13,13 @@ import {
   COMPETITION_GROUPS,
   competitionGroupOf,
   findHistoryLeague,
-  buildSeasonOptions,
+  findStatsBombLeagues,
+  mergeSeasonSources,
   normalizeVenue,
   seasonDateRange,
   seasonLabel,
   type SeasonOption,
+  type SeasonSource,
   type Venue,
 } from "@/lib/competitions";
 import StandingsTable from "@/components/league/StandingsTable";
@@ -48,18 +50,24 @@ export default async function LeaguePage({
 
   const archive = await getArchiveLeagues().catch(() => []);
   const history = findHistoryLeague(league, archive);
+  const statsbomb = findStatsBombLeagues(league, archive);
 
-  const [activeSeasons, historySeasons] = await Promise.all([
-    getLeagueSeasons(league.id).catch(() => []),
-    history ? getLeagueSeasons(history.id).catch(() => []) : Promise.resolve([]),
-  ]);
-
-  const seasons = buildSeasonOptions(
-    league,
-    activeSeasons,
-    history,
-    historySeasons
+  // Seasons from every source: the live row, each StatsBomb season row (rich
+  // data), and the football-data history row.
+  const sourceLeagues = [
+    { kind: "live" as const, id: league.id },
+    ...statsbomb.map((sb) => ({ kind: "statsbomb" as const, id: sb.id })),
+    ...(history ? [{ kind: "history" as const, id: history.id }] : []),
+  ];
+  const seasonLists = await Promise.all(
+    sourceLeagues.map((s) => getLeagueSeasons(s.id).catch(() => []))
   );
+  const sources: SeasonSource[] = sourceLeagues.map((s, i) => ({
+    leagueId: s.id,
+    kind: s.kind,
+    seasons: seasonLists[i],
+  }));
+  const seasons = mergeSeasonSources(sources);
 
   const requested = searchParams.season;
   const selected =
@@ -94,11 +102,18 @@ export default async function LeaguePage({
             <h1 className="text-2xl font-semibold tracking-tight">
               {league.name}
             </h1>
-            <p className="text-sm text-text-secondary">
-              {league.country}
-              {selected && ` · ${seasonLabel(selected.value)} season`}
+            <p className="flex flex-wrap items-center gap-x-1.5 text-sm text-text-secondary">
+              <span>
+                {league.country}
+                {selected && ` · ${seasonLabel(selected.value)} season`}
+              </span>
               {selected && !selected.isLive && (
-                <span className="ml-1 text-text-muted">(archived)</span>
+                <span className="text-text-muted">(archived)</span>
+              )}
+              {selected?.rich && (
+                <span className="rounded-full bg-accent/15 px-2 py-0.5 text-[11px] font-medium text-accent">
+                  ✦ Full data — lineups, goals &amp; assists, detailed stats
+                </span>
               )}
             </p>
           </div>
