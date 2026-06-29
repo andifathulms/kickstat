@@ -137,7 +137,7 @@ export default async function HomePage() {
                     href={`/league/${l.slug}`}
                     className="card card-hover flex items-center gap-3 p-3"
                   >
-                    <CompetitionBadge name={l.name} />
+                    <CompetitionBadge name={l.name} country={l.country} />
                     <div className="min-w-0">
                       <div className="truncate text-sm font-medium">
                         {l.name}

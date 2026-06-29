@@ -96,7 +96,11 @@ export default async function LeaguePage({
       <header className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6">
         <div className="pointer-events-none absolute inset-0 bg-accent-sheen opacity-60" />
         <div className="relative flex flex-wrap items-center gap-4">
-          <CompetitionBadge name={league.name} className="h-12 w-12 text-base" />
+          <CompetitionBadge
+            name={league.name}
+            country={league.country}
+            className="h-12 w-12 text-base"
+          />
           <div>
             <span className="stat-label text-accent/90">{group.label}</span>
             <h1 className="text-2xl font-semibold tracking-tight">

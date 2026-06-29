@@ -73,6 +73,7 @@ export default function StandingsBoard({ data }: { data: LeagueStandings[] }) {
                   >
                     <CompetitionBadge
                       name={l.name}
+                      country={l.country}
                       className="h-6 w-6 text-[10px]"
                     />
                     <span className="truncate">{l.name}</span>

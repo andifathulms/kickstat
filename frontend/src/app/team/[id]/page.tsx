@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getTeamFixtures, getTeamForm } from "@/lib/api";
 import { resultFor } from "@/lib/utils";
+import { teamAccent } from "@/lib/teamColor";
 import FormBadges from "@/components/team/FormBadge";
 import MatchList from "@/components/match/MatchList";
 import SectionHeader from "@/components/ui/SectionHeader";
@@ -39,6 +40,8 @@ export default async function TeamPage({
     .map((m) => resultFor(m, teamId))
     .filter((r): r is "W" | "D" | "L" => r !== null);
 
+  const accent = teamAccent(teamName);
+
   return (
     <div className="space-y-10">
       <nav className="flex items-center gap-2 text-xs text-text-secondary">
@@ -50,7 +53,14 @@ export default async function TeamPage({
       </nav>
 
       <header className="relative overflow-hidden rounded-2xl border border-border bg-surface p-6">
-        <div className="pointer-events-none absolute inset-0 bg-accent-sheen opacity-60" />
+        <div
+          className="pointer-events-none absolute inset-0"
+          style={{ background: accent.gradient }}
+        />
+        <span
+          className="absolute inset-y-0 left-0 w-1.5"
+          style={{ background: accent.color }}
+        />
         <div className="relative flex flex-wrap items-center justify-between gap-4">
           <div className="flex items-center gap-4">
             {team?.logo_url ? (
@@ -58,10 +68,15 @@ export default async function TeamPage({
               <img
                 src={team.logo_url}
                 alt=""
-                className="h-12 w-12 object-contain"
+                className="h-14 w-14 object-contain"
               />
             ) : (
-              <span className="h-12 w-12 rounded-full bg-surface-raised" />
+              <span
+                className="grid h-14 w-14 place-items-center rounded-full text-lg font-semibold"
+                style={{ background: accent.soft, color: accent.color }}
+              >
+                {teamName.slice(0, 2).toUpperCase()}
+              </span>
             )}
             <h1 className="text-2xl font-semibold tracking-tight">{teamName}</h1>
           </div>

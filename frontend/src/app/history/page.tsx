@@ -64,7 +64,7 @@ export default async function HistoryPage() {
                 className="card card-hover block p-4"
               >
                 <div className="flex items-center gap-3">
-                  <CompetitionBadge name={l.name} />
+                  <CompetitionBadge name={l.name} country={l.country} />
                   <div className="min-w-0">
                     <div className="truncate font-medium">{l.name}</div>
                     <div className="truncate text-xs text-text-secondary">
