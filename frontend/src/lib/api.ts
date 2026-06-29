@@ -10,6 +10,7 @@ import type {
   PlayerDetail,
   Prediction,
   RefereeDetail,
+  SearchResults,
   Standing,
   StadiumDetail,
 } from "./types";
@@ -104,6 +105,10 @@ export const getTeamForm = (id: string | number) =>
   get<MatchListItem[]>(`/teams/${id}/form/`);
 export const getTeamFixtures = (id: string | number) =>
   get<MatchListItem[]>(`/teams/${id}/fixtures/`);
+
+// Search
+export const search = (q: string) =>
+  get<SearchResults>(`/search/?q=${encodeURIComponent(q)}`, { revalidate: 0 });
 
 // People / venues
 export const getReferee = (id: string | number) =>

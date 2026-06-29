@@ -5,8 +5,17 @@ from django.db.models.functions import ExtractMonth, ExtractYear
 from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 
-from apps.matches.models import EventType, Match, MatchEvent, MatchLineup, MatchStatus
+from apps.matches.models import (
+    EventType,
+    Match,
+    MatchEvent,
+    MatchLineup,
+    MatchStatus,
+    Referee,
+    Stadium,
+)
 from apps.matches.serializers import MatchListSerializer
 
 from .models import Coach, League, Player, Standing, Team
@@ -431,4 +440,71 @@ class PlayerViewSet(viewsets.ReadOnlyModelViewSet):
         player = self.get_object()
         return _paginated_matches(
             self, Match.objects.filter(lineups__player=player).distinct()
+        )
+
+
+class SearchView(APIView):
+    """Unified name search across players, coaches, teams, referees,
+    stadiums and leagues. GET /api/search/?q=<term>[&limit=8]"""
+
+    def get(self, request):
+        q = (request.query_params.get("q") or "").strip()
+        try:
+            limit = min(int(request.query_params.get("limit", 8)), 25)
+        except ValueError:
+            limit = 8
+        if len(q) < 2:
+            return Response({"query": q, "results": {}})
+
+        players = (
+            Player.objects.filter(Q(name__icontains=q) | Q(nickname__icontains=q))
+            .select_related("team")[:limit]
+        )
+        coaches = Coach.objects.filter(name__icontains=q)[:limit]
+        teams = (
+            Team.objects.filter(Q(name__icontains=q) | Q(short_name__icontains=q))
+            .select_related("league")[:limit]
+        )
+        referees = Referee.objects.filter(name__icontains=q)[:limit]
+        stadiums = Stadium.objects.filter(name__icontains=q)[:limit]
+        leagues = League.objects.filter(name__icontains=q)[:limit]
+
+        return Response(
+            {
+                "query": q,
+                "results": {
+                    "players": [
+                        {
+                            "id": p.id,
+                            "name": p.nickname or p.name,
+                            "detail": p.team.name if p.team else (p.nationality or ""),
+                        }
+                        for p in players
+                    ],
+                    "coaches": [
+                        {"id": c.id, "name": c.name, "detail": c.nationality}
+                        for c in coaches
+                    ],
+                    "teams": [
+                        {
+                            "id": t.id,
+                            "name": t.name,
+                            "detail": t.league.name if t.league else "",
+                        }
+                        for t in teams
+                    ],
+                    "referees": [
+                        {"id": r.id, "name": r.name, "detail": r.country}
+                        for r in referees
+                    ],
+                    "stadiums": [
+                        {"id": s.id, "name": s.name.strip(), "detail": s.country}
+                        for s in stadiums
+                    ],
+                    "leagues": [
+                        {"id": l.id, "slug": l.slug, "name": l.name, "detail": l.country}
+                        for l in leagues
+                    ],
+                },
+            }
         )

@@ -96,6 +96,25 @@ export interface MatchEvent {
   detail: Record<string, unknown>;
 }
 
+export interface SearchHit {
+  id: number;
+  name: string;
+  detail: string;
+  slug?: string;
+}
+
+export interface SearchResults {
+  query: string;
+  results: {
+    players: SearchHit[];
+    coaches: SearchHit[];
+    teams: SearchHit[];
+    referees: SearchHit[];
+    stadiums: SearchHit[];
+    leagues: SearchHit[];
+  };
+}
+
 export interface RefereeDetail {
   id: number;
   name: string;
