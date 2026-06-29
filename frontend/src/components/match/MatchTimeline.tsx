@@ -1,3 +1,4 @@
+import Link from "next/link";
 import type { MatchDetail, MatchEvent } from "@/lib/types";
 import { cn } from "@/lib/utils";
 
@@ -38,21 +39,45 @@ function EventBody({ e, align }: { e: MatchEvent; align: "left" | "right" }) {
     e.type === "SUBSTITUTION"
       ? (e.detail.player_on as string) || e.player_name
       : e.player_name;
-  const sub =
-    e.type === "SUBSTITUTION"
-      ? `↓ ${(e.detail.player_off as string) ?? e.player_name ?? ""}`
-      : e.type === "GOAL" && e.assist_name
-        ? `assist: ${e.assist_name}`
-        : e.type === "OWN_GOAL"
-          ? "own goal"
-          : e.type === "GOAL" && e.detail.penalty
-            ? "penalty"
-            : null;
+  // For a sub, the linkable id is the player coming on (stored in `assist`).
+  const mainId = e.type === "SUBSTITUTION" ? e.assist_id : e.player_id;
+
   return (
     <div className={cn(align === "right" ? "text-right" : "text-left")}>
-      <div className="truncate text-sm font-medium">{main}</div>
-      {sub && (
-        <div className="truncate text-xs text-text-secondary">{sub}</div>
+      <div className="truncate text-sm font-medium">
+        {mainId ? (
+          <Link
+            href={`/player/${mainId}`}
+            className="transition-colors hover:text-accent"
+          >
+            {main}
+          </Link>
+        ) : (
+          main
+        )}
+      </div>
+      {e.type === "GOAL" && e.assist_name && (
+        <div className="truncate text-xs text-text-secondary">
+          assist:{" "}
+          {e.assist_id ? (
+            <Link href={`/player/${e.assist_id}`} className="hover:text-accent">
+              {e.assist_name}
+            </Link>
+          ) : (
+            e.assist_name
+          )}
+        </div>
+      )}
+      {e.type === "OWN_GOAL" && (
+        <div className="truncate text-xs text-text-secondary">own goal</div>
+      )}
+      {e.type === "GOAL" && !e.assist_name && e.detail.penalty === true && (
+        <div className="truncate text-xs text-text-secondary">penalty</div>
+      )}
+      {e.type === "SUBSTITUTION" && (
+        <div className="truncate text-xs text-text-secondary">
+          ↓ {(e.detail.player_off as string) ?? ""}
+        </div>
       )}
     </div>
   );

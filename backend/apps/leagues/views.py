@@ -6,15 +6,23 @@ from rest_framework import viewsets
 from rest_framework.decorators import action
 from rest_framework.response import Response
 
-from apps.matches.models import Match, MatchStatus
+from apps.matches.models import EventType, Match, MatchEvent, MatchLineup, MatchStatus
 from apps.matches.serializers import MatchListSerializer
 
-from .models import League, Standing, Team
+from .models import Coach, League, Player, Standing, Team
 from .serializers import (
+    CoachSerializer,
     LeagueSerializer,
+    PlayerSerializer,
     StandingSerializer,
     TeamSerializer,
 )
+
+
+def _paginated_matches(view, qs):
+    qs = qs.select_related("league", "home_team", "away_team").order_by("-kickoff")
+    page = view.paginate_queryset(qs)
+    return view.get_paginated_response(MatchListSerializer(page, many=True).data)
 
 
 # Season boundary: a football season starting in `year` runs Aug–Jul. August
@@ -343,4 +351,84 @@ class TeamViewSet(viewsets.ReadOnlyModelViewSet):
                 "goals_scored_avg": round(scored / played, 2) if played else 0,
                 "goals_conceded_avg": round(conceded / played, 2) if played else 0,
             }
+        )
+
+
+class CoachViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Coach.objects.all()
+    serializer_class = CoachSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        coach = self.get_object()
+        data = CoachSerializer(coach).data
+        played = won = drawn = lost = 0
+        teams = {}
+        qs = Match.objects.filter(
+            Q(home_coach=coach) | Q(away_coach=coach), status=MatchStatus.FINISHED
+        ).select_related("home_team", "away_team")
+        for m in qs:
+            if m.home_score is None or m.away_score is None:
+                continue
+            is_home = m.home_coach_id == coach.id
+            gf = m.home_score if is_home else m.away_score
+            ga = m.away_score if is_home else m.home_score
+            team = m.home_team if is_home else m.away_team
+            teams[team.id] = team.name
+            played += 1
+            if gf > ga:
+                won += 1
+            elif gf < ga:
+                lost += 1
+            else:
+                drawn += 1
+        data.update(
+            {
+                "played": played,
+                "won": won,
+                "drawn": drawn,
+                "lost": lost,
+                "teams": [{"id": tid, "name": name} for tid, name in teams.items()],
+            }
+        )
+        return Response(data)
+
+    @action(detail=True)
+    def matches(self, request, pk=None):
+        coach = self.get_object()
+        return _paginated_matches(
+            self, Match.objects.filter(Q(home_coach=coach) | Q(away_coach=coach))
+        )
+
+
+class PlayerViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Player.objects.select_related("team").all()
+    serializer_class = PlayerSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        player = self.get_object()
+        data = PlayerSerializer(player).data
+        events = MatchEvent.objects.filter(player=player)
+        appearances = (
+            MatchLineup.objects.filter(player=player)
+            .filter(Q(is_starter=True) | Q(subbed_on_minute__isnull=False))
+            .count()
+        )
+        data.update(
+            {
+                "appearances": appearances,
+                "goals": events.filter(type=EventType.GOAL).count(),
+                "assists": MatchEvent.objects.filter(
+                    type=EventType.GOAL, assist=player
+                ).count(),
+                "yellow_cards": events.filter(type=EventType.YELLOW).count(),
+                "red_cards": events.filter(type=EventType.RED).count(),
+            }
+        )
+        return Response(data)
+
+    @action(detail=True)
+    def matches(self, request, pk=None):
+        player = self.get_object()
+        return _paginated_matches(
+            self, Match.objects.filter(lineups__player=player).distinct()
         )

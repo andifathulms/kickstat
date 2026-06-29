@@ -1,4 +1,10 @@
-import type { MatchDetail, MatchLineupEntry, TeamMini } from "@/lib/types";
+import Link from "next/link";
+import type {
+  MatchDetail,
+  MatchLineupEntry,
+  NamedEntity,
+  TeamMini,
+} from "@/lib/types";
 
 function PlayerRow({ p }: { p: MatchLineupEntry }) {
   const name = p.player_nickname || p.player_name;
@@ -7,7 +13,12 @@ function PlayerRow({ p }: { p: MatchLineupEntry }) {
       <span className="w-6 shrink-0 text-center font-mono text-xs text-text-secondary tabular-nums">
         {p.shirt_number ?? "–"}
       </span>
-      <span className="min-w-0 flex-1 truncate">{name}</span>
+      <Link
+        href={`/player/${p.player_id}`}
+        className="min-w-0 flex-1 truncate transition-colors hover:text-accent"
+      >
+        {name}
+      </Link>
       <span className="flex shrink-0 items-center gap-1.5 text-xs">
         {p.subbed_off_minute != null && (
           <span className="text-red-card" title={`Off ${p.subbed_off_minute}'`}>
@@ -26,11 +37,11 @@ function PlayerRow({ p }: { p: MatchLineupEntry }) {
 
 function TeamColumn({
   team,
-  manager,
+  coach,
   players,
 }: {
   team: TeamMini;
-  manager: string;
+  coach: NamedEntity | null;
   players: MatchLineupEntry[];
 }) {
   const starters = players
@@ -51,10 +62,13 @@ function TeamColumn({
         )}
         <div className="min-w-0">
           <div className="truncate font-semibold">{team.name}</div>
-          {manager && (
-            <div className="truncate text-xs text-text-secondary">
-              {manager}
-            </div>
+          {coach && (
+            <Link
+              href={`/coach/${coach.id}`}
+              className="block truncate text-xs text-text-secondary transition-colors hover:text-accent"
+            >
+              {coach.name}
+            </Link>
           )}
         </div>
       </div>
@@ -93,29 +107,31 @@ export default function Lineups({ match }: { match: MatchDetail }) {
   return (
     <div className="space-y-4">
       <div className="grid gap-4 md:grid-cols-2">
-        <TeamColumn
-          team={match.home_team}
-          manager={match.home_coach?.name ?? ""}
-          players={home}
-        />
-        <TeamColumn
-          team={match.away_team}
-          manager={match.away_coach?.name ?? ""}
-          players={away}
-        />
+        <TeamColumn team={match.home_team} coach={match.home_coach} players={home} />
+        <TeamColumn team={match.away_team} coach={match.away_coach} players={away} />
       </div>
       {(match.referee || match.stadium) && (
         <div className="card flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm text-text-secondary">
           {match.stadium && (
             <span>
               <span className="stat-label mr-2">Stadium</span>
-              {match.stadium.name}
+              <Link
+                href={`/stadium/${match.stadium.id}`}
+                className="transition-colors hover:text-accent"
+              >
+                {match.stadium.name.trim()}
+              </Link>
             </span>
           )}
           {match.referee && (
             <span>
               <span className="stat-label mr-2">Referee</span>
-              {match.referee.name}
+              <Link
+                href={`/referee/${match.referee.id}`}
+                className="transition-colors hover:text-accent"
+              >
+                {match.referee.name}
+              </Link>
             </span>
           )}
         </div>

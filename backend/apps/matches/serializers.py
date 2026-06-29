@@ -58,7 +58,9 @@ class MatchOddsSerializer(serializers.ModelSerializer):
 
 class MatchEventSerializer(serializers.ModelSerializer):
     team = serializers.IntegerField(source="team_id", read_only=True)
+    player_id = serializers.IntegerField(read_only=True)
     player_name = serializers.CharField(source="player.name", read_only=True)
+    assist_id = serializers.IntegerField(read_only=True)
     assist_name = serializers.CharField(source="assist.name", read_only=True)
 
     class Meta:
@@ -68,7 +70,9 @@ class MatchEventSerializer(serializers.ModelSerializer):
             "minute",
             "type",
             "team",
+            "player_id",
             "player_name",
+            "assist_id",
             "assist_name",
             "detail",
         )

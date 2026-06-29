@@ -1,13 +1,17 @@
 import type {
   ArchiveLeague,
+  CoachDetail,
   League,
   LeagueSeason,
   MatchDetail,
   MatchListItem,
   MatchWithStats,
   Paginated,
+  PlayerDetail,
   Prediction,
+  RefereeDetail,
   Standing,
+  StadiumDetail,
 } from "./types";
 
 // Browser calls go to the publicly-published backend URL; server-side rendering
@@ -100,5 +104,26 @@ export const getTeamForm = (id: string | number) =>
   get<MatchListItem[]>(`/teams/${id}/form/`);
 export const getTeamFixtures = (id: string | number) =>
   get<MatchListItem[]>(`/teams/${id}/fixtures/`);
+
+// People / venues
+export const getReferee = (id: string | number) =>
+  get<RefereeDetail>(`/referees/${id}/`);
+export const getStadium = (id: string | number) =>
+  get<StadiumDetail>(`/stadiums/${id}/`);
+export const getCoach = (id: string | number) =>
+  get<CoachDetail>(`/coaches/${id}/`);
+export const getPlayer = (id: string | number) =>
+  get<PlayerDetail>(`/players/${id}/`);
+
+const entityMatches = (kind: string, id: string | number, page = 1) =>
+  get<Paginated<MatchListItem>>(`/${kind}/${id}/matches/?page=${page}`);
+export const getRefereeMatches = (id: string | number, page = 1) =>
+  entityMatches("referees", id, page);
+export const getStadiumMatches = (id: string | number, page = 1) =>
+  entityMatches("stadiums", id, page);
+export const getCoachMatches = (id: string | number, page = 1) =>
+  entityMatches("coaches", id, page);
+export const getPlayerMatches = (id: string | number, page = 1) =>
+  entityMatches("players", id, page);
 
 export { API_URL };

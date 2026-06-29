@@ -89,9 +89,53 @@ export interface MatchEvent {
   type: MatchEventType;
   /** team id (null if unknown) */
   team: number | null;
+  player_id: number | null;
   player_name: string | null;
+  assist_id: number | null;
   assist_name: string | null;
   detail: Record<string, unknown>;
+}
+
+export interface RefereeDetail {
+  id: number;
+  name: string;
+  country: string;
+  match_count: number;
+}
+
+export interface StadiumDetail {
+  id: number;
+  name: string;
+  country: string;
+  match_count: number;
+}
+
+export interface CoachDetail {
+  id: number;
+  name: string;
+  nationality: string;
+  date_of_birth: string | null;
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  teams: { id: number; name: string }[];
+}
+
+export interface PlayerDetail {
+  id: number;
+  name: string;
+  nickname: string;
+  position: string;
+  nationality: string;
+  date_of_birth: string | null;
+  team: number | null;
+  team_name: string | null;
+  appearances: number;
+  goals: number;
+  assists: number;
+  yellow_cards: number;
+  red_cards: number;
 }
 
 export interface MatchLineupEntry {

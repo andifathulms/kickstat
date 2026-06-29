@@ -1,6 +1,12 @@
 from rest_framework import serializers
 
-from .models import League, Player, Standing, Team
+from .models import Coach, League, Player, Standing, Team
+
+
+class CoachSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = Coach
+        fields = ("id", "name", "nationality", "date_of_birth")
 
 
 class LeagueSerializer(serializers.ModelSerializer):
@@ -42,15 +48,19 @@ class TeamMiniSerializer(serializers.ModelSerializer):
 
 
 class PlayerSerializer(serializers.ModelSerializer):
+    team_name = serializers.CharField(source="team.name", read_only=True)
+
     class Meta:
         model = Player
         fields = (
             "id",
             "name",
+            "nickname",
             "position",
             "nationality",
             "date_of_birth",
             "team",
+            "team_name",
         )
 
 

@@ -4,14 +4,23 @@ from rest_framework.generics import get_object_or_404
 from rest_framework.response import Response
 
 from .filters import MatchFilter
-from .models import Match, MatchStatus
+from .models import Match, MatchStatus, Referee, Stadium
 from .serializers import (
     MatchDetailSerializer,
     MatchEventSerializer,
     MatchListSerializer,
     MatchListWithStatsSerializer,
     MatchStatsSerializer,
+    RefereeSerializer,
+    StadiumSerializer,
 )
+
+
+def _match_list_response(view, qs):
+    """Paginated MatchListSerializer response for an entity's match list."""
+    qs = qs.select_related("league", "home_team", "away_team").order_by("-kickoff")
+    page = view.paginate_queryset(qs)
+    return view.get_paginated_response(MatchListSerializer(page, many=True).data)
 
 
 class MatchViewSet(viewsets.ReadOnlyModelViewSet):
@@ -75,3 +84,33 @@ class MatchViewSet(viewsets.ReadOnlyModelViewSet):
         if prediction is None:
             return Response({}, status=404)
         return Response(MatchPredictionSerializer(prediction).data)
+
+
+class RefereeViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Referee.objects.all()
+    serializer_class = RefereeSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        obj = self.get_object()
+        data = RefereeSerializer(obj).data
+        data["match_count"] = obj.matches.count()
+        return Response(data)
+
+    @action(detail=True)
+    def matches(self, request, pk=None):
+        return _match_list_response(self, self.get_object().matches.all())
+
+
+class StadiumViewSet(viewsets.ReadOnlyModelViewSet):
+    queryset = Stadium.objects.all()
+    serializer_class = StadiumSerializer
+
+    def retrieve(self, request, *args, **kwargs):
+        obj = self.get_object()
+        data = StadiumSerializer(obj).data
+        data["match_count"] = obj.matches.count()
+        return Response(data)
+
+    @action(detail=True)
+    def matches(self, request, pk=None):
+        return _match_list_response(self, self.get_object().matches.all())
