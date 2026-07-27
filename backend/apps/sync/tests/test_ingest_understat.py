@@ -285,3 +285,84 @@ class MergeDetailsTests(MergeBaseTestCase):
         stats = MatchStats.objects.get(match=self.match)
         self.assertEqual(stats.extra["home"]["deep_completions"], 12)
         self.assertEqual(stats.extra["away"]["ppda"], 20.19)
+
+
+def duplicated(rosters):
+    """Reproduce Understat serving a match with its whole roster twice over."""
+    out = {}
+    for side, rows in rosters.items():
+        copy = {}
+        for rid, row in rows.items():
+            copy[rid] = row
+            shadow = dict(row, id=str(int(rid) + 100))
+            for link in ("roster_in", "roster_out"):
+                if row.get(link) and row[link] != "0":
+                    shadow[link] = str(int(row[link]) + 100)
+            copy[shadow["id"]] = shadow
+        out[side] = copy
+    return out
+
+
+class DuplicatedPayloadTests(MergeBaseTestCase):
+    """Some matches come back with every player and shot served twice."""
+
+    def setUp(self):
+        super().setUp()
+        rosters = duplicated(ROSTERS)
+        shots = {k: v + [dict(s, id=str(int(s.get("id", 0)) + 100)) for s in v]
+                 for k, v in SHOTS.items()}
+
+        class DupClient(FakeClient):
+            def match_data(self, match_id):
+                self.match_calls.append(match_id)
+                return MATCH_INFO, {"rosters": rosters, "shots": shots}
+
+        run("--league", "EPL", "--season", "2023", "--details", client=DupClient())
+
+    def test_lineups_are_not_duplicated(self):
+        lineups = MatchLineup.objects.filter(match=self.match)
+        self.assertEqual(lineups.count(), 4)
+        self.assertEqual(len({l.player_id for l in lineups}), 4)
+
+    def test_goals_are_not_double_counted(self):
+        self.assertEqual(
+            MatchEvent.objects.filter(match=self.match, type=EventType.GOAL).count(), 1
+        )
+        self.assertEqual(
+            MatchEvent.objects.filter(
+                match=self.match, type=EventType.OWN_GOAL
+            ).count(),
+            1,
+        )
+
+    def test_substitution_pairing_survives_deduplication(self):
+        subs = MatchEvent.objects.filter(match=self.match, type=EventType.SUBSTITUTION)
+        self.assertEqual(subs.count(), 1)
+        sub = subs.get()
+        self.assertEqual(sub.minute, 70)
+        self.assertEqual(sub.player.name, "Erling Haaland")
+        self.assertEqual(sub.assist.name, "Julián Álvarez")
+
+    def test_cards_are_not_duplicated(self):
+        self.assertEqual(
+            MatchEvent.objects.filter(match=self.match, type=EventType.YELLOW).count(), 1
+        )
+
+
+class DedupeHelperTests(TestCase):
+    def test_dedupe_rosters_keys_on_player_not_roster_id(self):
+        out = cmd.dedupe_rosters(duplicated(ROSTERS))
+        self.assertEqual(len(out["h"]), 3)
+        self.assertEqual(len(out["a"]), 1)
+
+    def test_dedupe_shots_keeps_genuinely_distinct_shots(self):
+        two = [
+            {"minute": "30", "player_id": "1", "result": "Goal", "X": "0.9", "Y": "0.5", "xG": "0.4"},
+            {"minute": "30", "player_id": "1", "result": "Goal", "X": "0.8", "Y": "0.4", "xG": "0.2"},
+        ]
+        self.assertEqual(len(cmd.dedupe_shots({"h": two})["h"]), 2)
+        self.assertEqual(len(cmd.dedupe_shots({"h": two + two})["h"]), 2)
+
+    def test_dedupe_handles_missing_sections(self):
+        self.assertEqual(cmd.dedupe_rosters(None), {})
+        self.assertEqual(cmd.dedupe_shots(None), {})

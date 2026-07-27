@@ -26,7 +26,7 @@ from datetime import datetime, timedelta, timezone
 
 import requests
 from django.core.management.base import BaseCommand, CommandError
-from django.db import transaction
+from django.db import DatabaseError, transaction
 
 from apps.common.names import clean_name
 from apps.leagues.models import League, Player, Source, Team
@@ -123,6 +123,50 @@ def normalise(name: str) -> str:
     folded = re.sub(r"[^a-z0-9 ]", " ", folded)
     folded = _NOISE_WORDS.sub(" ", folded)
     return " ".join(folded.split())
+
+
+def dedupe_rosters(rosters):
+    """Collapse a match whose roster Understat has served twice over.
+
+    Some matches come back with the whole team sheet duplicated — every player
+    under two roster ids, with a second, self-consistent set of substitution
+    links. A player cannot legitimately hold two roster rows, so keying on
+    player id is unambiguous. Returns ``{side: [row]}``.
+    """
+    out = {}
+    for side, rows in (rosters or {}).items():
+        seen = {}
+        for row in rows.values():
+            seen.setdefault(str(row.get("player_id")), row)
+        out[side] = list(seen.values())
+    return out
+
+
+def dedupe_shots(shots):
+    """Drop shots repeated by the same duplication, keyed on what a shot *is*.
+
+    The copies carry different shot ids, so identity has to come from the
+    event: same player, minute, outcome, pitch coordinates and xG. Two genuinely
+    distinct shots agreeing on all six is not a thing that happens.
+    """
+    out = {}
+    for side, rows in (shots or {}).items():
+        seen, kept = set(), []
+        for shot in rows:
+            key = (
+                shot.get("minute"),
+                shot.get("player_id"),
+                shot.get("result"),
+                shot.get("X"),
+                shot.get("Y"),
+                shot.get("xG"),
+            )
+            if key in seen:
+                continue
+            seen.add(key)
+            kept.append(shot)
+        out[side] = kept
+    return out
 
 
 def _to_int(value):
@@ -382,10 +426,17 @@ class Command(BaseCommand):
             return 0
 
         sides = {"h": match.home_team, "a": match.away_team}
-        with transaction.atomic():
-            players, subs = self._store_lineups(match, rosters, sides)
-            self._store_timeline(match, data, rosters, sides, players, subs)
-            self._merge_extra_stats(match, info)
+        deduped = dedupe_rosters(rosters)
+        shots = dedupe_shots(data.get("shots"))
+        try:
+            with transaction.atomic():
+                players, subs = self._store_lineups(match, rosters, deduped, sides)
+                self._store_timeline(match, shots, deduped, sides, players, subs)
+                self._merge_extra_stats(match, info)
+        except DatabaseError as exc:
+            # One malformed match should cost that match, not the season.
+            self.stderr.write(f"  match {understat_id}: {exc}")
+            return 0
         return 1
 
     def _merge_extra_stats(self, match, info):
@@ -417,7 +468,7 @@ class Command(BaseCommand):
         )
         return player
 
-    def _store_lineups(self, match, rosters, sides):
+    def _store_lineups(self, match, rosters, deduped, sides):
         """Rebuild this match's lineups.
 
         Understat reports minutes played rather than substitution minutes, but
@@ -425,6 +476,10 @@ class Command(BaseCommand):
         the player who replaced them, and a sub's ``roster_out`` is the starter
         they came on for. So a starter leaves at their own ``time``, and their
         replacement enters at that same minute.
+
+        ``rosters`` is the raw payload — the pairing lookup needs every roster
+        row, including ones dropped as duplicates — while ``deduped`` is what
+        actually becomes lineup rows.
 
         Returns ``({understat player id: Player}, [(team, minute, off, on)])``.
         """
@@ -436,16 +491,15 @@ class Command(BaseCommand):
                 by_roster_id[str(row.get("id"))] = row
 
         rows, players, by_roster_player, subs = [], {}, {}, []
-        for side, entries in rosters.items():
+        for side, entries in deduped.items():
             team = sides.get(side)
             if team is None:
                 continue
-            for row in entries.values():
+            for row in entries:
                 player = self._player(row.get("player_id"), row.get("player"), team)
                 if player is None:
                     continue
                 players[str(row.get("player_id"))] = player
-                by_roster_player[str(row.get("id"))] = player
 
                 position = row.get("position") or ""
                 is_starter = position != "Sub"
@@ -469,12 +523,20 @@ class Command(BaseCommand):
                 )
         MatchLineup.objects.bulk_create(rows)
 
+        # Every raw roster row maps to its Player, so a pairing pointing at a
+        # row that was dropped as a duplicate still resolves.
+        for roster_id, row in by_roster_id.items():
+            player = players.get(str(row.get("player_id")))
+            if player is not None:
+                by_roster_player[roster_id] = player
+
         # Second pass: both halves of each pairing now have a Player row.
-        for side, entries in rosters.items():
+        seen_subs = set()
+        for side, entries in deduped.items():
             team = sides.get(side)
             if team is None:
                 continue
-            for row in entries.values():
+            for row in entries:
                 if (row.get("position") or "") != "Sub":
                     continue
                 replaced = by_roster_id.get(str(row.get("roster_out")))
@@ -482,22 +544,26 @@ class Command(BaseCommand):
                 off = by_roster_player.get(str(row.get("roster_out")))
                 if replaced is None or on is None:
                     continue
+                key = (team.id, off.id if off else None, on.id)
+                if key in seen_subs:
+                    continue
+                seen_subs.add(key)
                 subs.append((team, _to_int(replaced.get("time")), off, on))
         return players, subs
 
-    def _store_timeline(self, match, data, rosters, sides, players, subs):
+    def _store_timeline(self, match, shots_by_side, deduped, sides, players, subs):
         """Rebuild goals, assists, cards and substitutions from the shot map."""
         match.events.all().delete()
 
         by_name = {}
-        for side, entries in rosters.items():
-            for row in entries.values():
+        for side, entries in deduped.items():
+            for row in entries:
                 player = players.get(str(row.get("player_id")))
                 if player is not None:
                     by_name[clean_name(row.get("player"))] = player
 
         rows = []
-        for side, shots in (data.get("shots") or {}).items():
+        for side, shots in shots_by_side.items():
             team = sides.get(side)
             if team is None:
                 continue
@@ -527,11 +593,11 @@ class Command(BaseCommand):
                     )
                 )
 
-        for side, entries in rosters.items():
+        for side, entries in deduped.items():
             team = sides.get(side)
             if team is None:
                 continue
-            for row in entries.values():
+            for row in entries:
                 player = players.get(str(row.get("player_id")))
                 if player is None:
                     continue
