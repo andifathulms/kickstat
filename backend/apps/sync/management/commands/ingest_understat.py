@@ -438,6 +438,10 @@ class Command(BaseCommand):
         info, data = data
         rosters = data.get("rosters") or {}
         if not rosters.get("h") or not rosters.get("a"):
+            # Understat carries the fixture and its xG but no roster at all for
+            # a handful of matches. Say so, rather than returning a silent zero
+            # that reads identically to a crash we swallowed.
+            self.stderr.write(f"  match {understat_id}: no roster upstream")
             return 0
 
         sides = {"h": match.home_team, "a": match.away_team}

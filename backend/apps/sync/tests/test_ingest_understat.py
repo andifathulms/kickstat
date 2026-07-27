@@ -1,4 +1,5 @@
 import json
+from io import StringIO
 from datetime import datetime, timezone
 from unittest import mock
 
@@ -408,3 +409,24 @@ class TeamAliasTableTests(TestCase):
             self.assertNotIn(
                 value, cmd.TEAM_ALIASES, f"alias {key!r} -> {value!r} chains"
             )
+
+
+class EmptyRosterTests(MergeBaseTestCase):
+    def test_missing_roster_is_reported_not_silent(self):
+        class NoRosterClient(FakeClient):
+            def match_data(self, match_id):
+                self.match_calls.append(match_id)
+                return MATCH_INFO, {"rosters": {"h": {}, "a": {}}, "shots": {}}
+
+        err = StringIO()
+        client = NoRosterClient()
+        with mock.patch.object(cmd, "UnderstatClient", return_value=client), \
+                mock.patch.object(cmd.time, "sleep"):
+            call_command(
+                "ingest_understat", "--league", "EPL", "--season", "2023",
+                "--details", stderr=err,
+            )
+        self.assertIn("no roster upstream", err.getvalue())
+        # The xG merge still lands; only the detail half is missing.
+        self.assertEqual(MatchStats.objects.get(match=self.match).home_xg, 2.41)
+        self.assertEqual(MatchLineup.objects.count(), 0)
