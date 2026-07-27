@@ -236,3 +236,14 @@ class BackfillTests(TestCase):
         League.objects.all().delete()
         with self.assertRaises(CommandError):
             run("--division", "E0")
+
+
+class ClubMapTests(TestCase):
+    def test_each_division_maps_clubs_to_distinct_qids(self):
+        for division, clubs in cmd.DIVISION_CLUBS.items():
+            qids = list(clubs.values())
+            self.assertEqual(
+                len(qids), len(set(qids)), f"{division} maps two clubs to one QID"
+            )
+            for name, qid in clubs.items():
+                self.assertRegex(qid, r"^Q\d+$", f"{division}/{name}")
