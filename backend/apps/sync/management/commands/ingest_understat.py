@@ -44,7 +44,12 @@ USER_AGENT = "Mozilla/5.0 (Kickstat data ingest)"
 # Be polite: Understat is a small unofficial site and --details is chatty
 # (two requests per match).
 REQUEST_DELAY_SECONDS = 1.0
-MAX_RETRIES = 3
+# Five rather than three because the failures seen in practice are DNS
+# resolution blips lasting several seconds, and three attempts at a 3/6 second
+# backoff gives up while the resolver is still down. The extra attempts only
+# ever run on a request that has already failed, so this costs nothing on the
+# happy path.
+MAX_RETRIES = 5
 
 # How far apart the two sources' kickoff stamps may sit for the same fixture.
 MATCH_WINDOW = timedelta(days=3)
