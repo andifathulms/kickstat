@@ -46,6 +46,9 @@ USER_AGENT = "Mozilla/5.0 (Kickstat data ingest)"
 REQUEST_DELAY_SECONDS = 1.0
 MAX_RETRIES = 3
 
+# How far apart the two sources' kickoff stamps may sit for the same fixture.
+MATCH_WINDOW = timedelta(days=3)
+
 # Understat league code -> the football-data.co.uk division whose "(history)"
 # League row holds the matches we are enriching.
 LEAGUE_DIVISIONS = {
@@ -383,15 +386,19 @@ class Command(BaseCommand):
         kickoff = datetime.strptime(entry["datetime"], "%Y-%m-%d %H:%M:%S").replace(
             tzinfo=timezone.utc
         )
-        # Kickoff times differ by source (and by timezone at the edges), so key
-        # on the fixture itself and allow a day either side.
+        # Kickoff times differ by source, and some football-data.co.uk rows
+        # carry no time at all so they land at 00:00 while Understat's stamp is
+        # a day and a half later. Widen the window past that. A league fixture
+        # with the same home and away side does not recur within days, so this
+        # cannot pull in a different match — and the "exactly one" check below
+        # is the real guard.
         matches = list(
             Match.objects.filter(
                 league=league,
                 home_team=home,
                 away_team=away,
-                kickoff__gte=kickoff - timedelta(days=1),
-                kickoff__lte=kickoff + timedelta(days=1),
+                kickoff__gte=kickoff - MATCH_WINDOW,
+                kickoff__lte=kickoff + MATCH_WINDOW,
             )
         )
         if len(matches) != 1:

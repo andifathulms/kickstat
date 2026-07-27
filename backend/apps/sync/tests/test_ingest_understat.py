@@ -366,3 +366,21 @@ class DedupeHelperTests(TestCase):
     def test_dedupe_handles_missing_sections(self):
         self.assertEqual(cmd.dedupe_rosters(None), {})
         self.assertEqual(cmd.dedupe_shots(None), {})
+
+
+class KickoffWindowTests(MergeBaseTestCase):
+    """Some football-data.co.uk rows carry no kickoff time, so they sit at
+    00:00 while Understat stamps the same fixture a day and a half later."""
+
+    def test_matches_across_a_thirty_hour_gap(self):
+        self.match.kickoff = datetime(2023, 10, 28, 0, 0, tzinfo=timezone.utc)
+        self.match.save(update_fields=["kickoff"])
+        # ENTRIES[0] kicks off 2023-10-29 15:30 — 39.5 hours later.
+        run("--league", "EPL", "--season", "2023")
+        self.assertEqual(MatchStats.objects.get(match=self.match).home_xg, 2.41)
+
+    def test_still_refuses_a_fixture_outside_the_window(self):
+        self.match.kickoff = datetime(2023, 11, 15, 0, 0, tzinfo=timezone.utc)
+        self.match.save(update_fields=["kickoff"])
+        run("--league", "EPL", "--season", "2023")
+        self.assertEqual(MatchStats.objects.count(), 0)
