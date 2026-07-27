@@ -21,7 +21,7 @@ from django.core.management.base import BaseCommand, CommandError
 from django.utils.text import slugify
 
 from apps.leagues.models import League, Source, Team
-from apps.matches.models import Match, MatchStats, MatchStatus
+from apps.matches.models import Match, MatchStats, MatchStatus, Referee
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281"
 
@@ -36,9 +36,20 @@ def fetch_csv(url):
     404 means the division/season doesn't exist -> skip (no retry). Transient
     failures (timeouts, SSL, 5xx, rate-limit) are retried with backoff.
     """
+    # The host's TLS certificate does not cover www.football-data.co.uk, so
+    # verification fails. These are public, unauthenticated static CSVs — fall
+    # back to an unverified fetch rather than losing the source entirely.
     for attempt in range(1, MAX_RETRIES + 1):
         try:
             resp = requests.get(url, timeout=60)
+        except requests.exceptions.SSLError:
+            try:
+                resp = requests.get(url, timeout=60, verify=False)
+            except requests.RequestException:
+                if attempt == MAX_RETRIES:
+                    return None
+                time.sleep(attempt * 2)
+                continue
         except requests.RequestException:
             if attempt == MAX_RETRIES:
                 return None
@@ -171,6 +182,16 @@ class Command(BaseCommand):
         self.stdout.write(f"  {count} matches")
         return count
 
+    def _referee(self, name):
+        """The CSVs carry a `Referee` column as an abbreviated name ("A Taylor")."""
+        name = (name or "").strip()
+        if not name:
+            return None
+        ref, _ = Referee.objects.get_or_create(
+            external_id=f"fduk-{slugify(name)}", defaults={"name": name}
+        )
+        return ref
+
     def _ingest_row(self, row, division, season, league):
         kickoff = _parse_date(row.get("Date"), row.get("Time"))
         if kickoff is None:
@@ -187,6 +208,7 @@ class Command(BaseCommand):
                 "away_team": away,
                 "kickoff": kickoff,
                 "status": MatchStatus.FINISHED,
+                "referee": self._referee(row.get("Referee")),
                 "home_score": _to_int(row.get("FTHG")),
                 "away_score": _to_int(row.get("FTAG")),
                 "raw_data": {k: v for k, v in row.items() if v not in (None, "")},
