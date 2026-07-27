@@ -12,6 +12,7 @@ from datetime import datetime, timezone
 import requests
 from django.core.management.base import BaseCommand, CommandError
 
+from apps.common.names import clean_name
 from apps.leagues.models import Coach, League, Player, Source, Team
 from apps.matches.models import (
     EventType,
@@ -344,8 +345,8 @@ class Command(BaseCommand):
         player, _ = Player.objects.update_or_create(
             external_id=f"sb-{player_id}",
             defaults={
-                "name": name or "",
-                "nickname": nickname or "",
+                "name": clean_name(name) or "",
+                "nickname": clean_name(nickname) or "",
                 "nationality": nationality or "",
                 "position": position or "",
                 "team": team,
@@ -358,7 +359,7 @@ class Command(BaseCommand):
             return None
         obj, _ = Referee.objects.update_or_create(
             external_id=f"sb-{ref['id']}" if ref.get("id") else "",
-            name=ref["name"],
+            name=clean_name(ref["name"]),
             defaults={"country": (ref.get("country") or {}).get("name", "")},
         )
         return obj
@@ -368,7 +369,7 @@ class Command(BaseCommand):
             return None
         obj, _ = Stadium.objects.update_or_create(
             external_id=f"sb-{st['id']}" if st.get("id") else "",
-            name=st["name"],
+            name=clean_name(st["name"]),
             defaults={"country": (st.get("country") or {}).get("name", "")},
         )
         return obj
@@ -380,7 +381,7 @@ class Command(BaseCommand):
         m = managers[0]
         obj, _ = Coach.objects.update_or_create(
             external_id=f"sb-{m['id']}" if m.get("id") else "",
-            name=m.get("name", ""),
+            name=clean_name(m.get("name", "")),
             defaults={
                 "nationality": (m.get("country") or {}).get("name", ""),
                 "date_of_birth": m.get("dob") or None,

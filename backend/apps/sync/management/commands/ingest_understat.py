@@ -18,7 +18,6 @@ Run ``ingest_football_data_uk`` for the season first.
 Understat is an unofficial source; this is for personal/research use.
 """
 import codecs
-import html
 import json
 import re
 import time
@@ -29,6 +28,7 @@ import requests
 from django.core.management.base import BaseCommand, CommandError
 from django.db import transaction
 
+from apps.common.names import clean_name
 from apps.leagues.models import League, Player, Source, Team
 from apps.matches.models import (
     EventType,
@@ -110,14 +110,9 @@ def parse_match_info(html: str) -> dict:
         return {}
 
 
-def unescape(value):
-    """Understat HTML-escapes names — "Matt O&#039;Riley" — so undo that."""
-    return html.unescape(value) if isinstance(value, str) else value
-
-
 def normalise(name: str) -> str:
     """Fold accents, punctuation and club-type noise so names can be compared."""
-    folded = unicodedata.normalize("NFKD", unescape(name) or "")
+    folded = unicodedata.normalize("NFKD", clean_name(name) or "")
     folded = folded.encode("ascii", "ignore").decode("ascii").lower()
     folded = folded.replace("'", "")  # Nott'm -> nottm, not "nott m"
     folded = re.sub(r"[^a-z0-9 ]", " ", folded)
@@ -413,7 +408,7 @@ class Command(BaseCommand):
             return None
         player, _ = Player.objects.update_or_create(
             external_id=f"us-{understat_id}",
-            defaults={"name": unescape(name), "team": team},
+            defaults={"name": clean_name(name), "team": team},
         )
         return player
 
@@ -494,7 +489,7 @@ class Command(BaseCommand):
             for row in entries.values():
                 player = players.get(str(row.get("player_id")))
                 if player is not None:
-                    by_name[unescape(row.get("player"))] = player
+                    by_name[clean_name(row.get("player"))] = player
 
         rows = []
         for side, shots in (data.get("shots") or {}).items():
@@ -505,8 +500,8 @@ class Command(BaseCommand):
                 result = shot.get("result")
                 if result not in ("Goal", "OwnGoal"):
                     continue
-                scorer = by_name.get(unescape(shot.get("player")))
-                assist = by_name.get(unescape(shot.get("player_assisted")))
+                scorer = by_name.get(clean_name(shot.get("player")))
+                assist = by_name.get(clean_name(shot.get("player_assisted")))
                 is_own = result == "OwnGoal"
                 rows.append(
                     MatchEvent(
