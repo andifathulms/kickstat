@@ -94,22 +94,22 @@ function TeamColumn({
 }
 
 export default function Lineups({ match }: { match: MatchDetail }) {
-  if (!match.lineups || match.lineups.length === 0) {
-    return (
-      <p className="card p-8 text-center text-sm text-text-secondary">
-        Lineups are not available for this match.
-      </p>
-    );
-  }
-  const home = match.lineups.filter((p) => p.team === match.home_team.id);
-  const away = match.lineups.filter((p) => p.team === match.away_team.id);
+  const lineups = match.lineups ?? [];
+  const home = lineups.filter((p) => p.team === match.home_team.id);
+  const away = lineups.filter((p) => p.team === match.away_team.id);
 
   return (
     <div className="space-y-4">
-      <div className="grid gap-4 md:grid-cols-2">
-        <TeamColumn team={match.home_team} coach={match.home_coach} players={home} />
-        <TeamColumn team={match.away_team} coach={match.away_coach} players={away} />
-      </div>
+      {lineups.length > 0 ? (
+        <div className="grid gap-4 md:grid-cols-2">
+          <TeamColumn team={match.home_team} coach={match.home_coach} players={home} />
+          <TeamColumn team={match.away_team} coach={match.away_coach} players={away} />
+        </div>
+      ) : (
+        <p className="card p-8 text-center text-sm text-text-secondary">
+          Lineups are not available for this match.
+        </p>
+      )}
       {(match.referee || match.stadium) && (
         <div className="card flex flex-wrap items-center gap-x-6 gap-y-1 p-4 text-sm text-text-secondary">
           {match.stadium && (

@@ -27,7 +27,13 @@ export default function MatchCenter({ match }: { match: MatchDetail }) {
   const hasStats = !!match.stats;
   const hasPrediction =
     !!match.prediction || !!match.odds?.implied_probabilities || !!match.score_prediction;
-  const hasLineups = (match.lineups?.length ?? 0) > 0;
+  // Sources vary: some matches have a full team sheet, others only officials.
+  const hasLineups =
+    (match.lineups?.length ?? 0) > 0 ||
+    !!match.referee ||
+    !!match.stadium ||
+    !!match.home_coach ||
+    !!match.away_coach;
   const available = ALL_TABS.filter((t) =>
     t === "Overview"
       ? hasEvents
@@ -136,7 +142,8 @@ export default function MatchCenter({ match }: { match: MatchDetail }) {
   );
 }
 
-// Extended stats (from StatsBomb events) shown beneath the headline bars.
+// Extended stats (StatsBomb events, or Understat for deep/PPDA) shown beneath
+// the headline bars. Only rows with data for this match are rendered.
 const EXTRA_ROWS: { key: string; label: string; pct?: boolean }[] = [
   { key: "passes", label: "Passes" },
   { key: "pass_accuracy", label: "Pass accuracy", pct: true },
@@ -150,6 +157,10 @@ const EXTRA_ROWS: { key: string; label: string; pct?: boolean }[] = [
   { key: "ball_recoveries", label: "Recoveries" },
   { key: "duels_won", label: "Duels won" },
   { key: "saves", label: "Saves" },
+  // Passes completed within ~20 yards of goal.
+  { key: "deep_completions", label: "Deep completions" },
+  // Opponent passes allowed per defensive action — lower means a higher press.
+  { key: "ppda", label: "PPDA" },
 ];
 
 function Stats({ match }: { match: MatchDetail }) {
