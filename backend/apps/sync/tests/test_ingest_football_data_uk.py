@@ -5,6 +5,7 @@ from django.test import TestCase
 
 from apps.leagues.models import League, Source, Team
 from apps.matches.models import Match, MatchStats, MatchStatus
+from apps.sync.management.commands import ingest_football_data_uk as cmd
 
 CSV = (
     "Div,Date,Time,HomeTeam,AwayTeam,FTHG,FTAG,FTR,"
@@ -63,3 +64,38 @@ class IngestFootballDataUkTests(TestCase):
         mocked_get.return_value = _fake_response("", status=404)
         call_command("ingest_football_data_uk", "--division", "E0", "--season", "9999")
         self.assertEqual(Match.objects.count(), 0)
+
+
+class FetchCsvTests(TestCase):
+    def test_accepts_a_real_csv_with_or_without_a_bom(self):
+        self.assertTrue(cmd.looks_like_csv("Div,Date,HomeTeam\nE0,01/01/24,Arsenal"))
+        self.assertTrue(cmd.looks_like_csv("﻿Div,Date,HomeTeam"))
+
+    def test_accepts_a_utf8_bom_decoded_as_latin1(self):
+        # How the BOM actually arrives: these files are decoded as latin-1, so
+        # the three BOM bytes become "ï»¿" rather than U+FEFF.
+        raw = "Div,Date,HomeTeam".encode("utf-8-sig")
+        self.assertEqual(raw[:3], b"\xef\xbb\xbf")
+        self.assertTrue(cmd.looks_like_csv(raw.decode("latin-1")))
+
+    def test_rejects_an_intercepted_html_response(self):
+        # ISP filtering portals answer with HTML that parses as a zero-row CSV.
+        self.assertFalse(cmd.looks_like_csv("<html><body>blocked</body></html>"))
+        self.assertFalse(cmd.looks_like_csv(""))
+        self.assertFalse(cmd.looks_like_csv(None))
+
+    def test_retries_past_an_intercepted_response(self):
+        good = "Div,Date,HomeTeam\nE0,01/01/24,Arsenal"
+        responses = [
+            mock.Mock(status_code=200, content=b"<html>blocked</html>"),
+            mock.Mock(status_code=200, content=good.encode("latin-1")),
+        ]
+        with mock.patch.object(cmd.requests, "get", side_effect=responses), \
+                mock.patch.object(cmd.time, "sleep"):
+            self.assertEqual(cmd.fetch_csv("http://x/E0.csv"), good)
+
+    def test_gives_up_when_every_attempt_is_intercepted(self):
+        blocked = mock.Mock(status_code=200, content=b"<html>blocked</html>")
+        with mock.patch.object(cmd.requests, "get", return_value=blocked), \
+                mock.patch.object(cmd.time, "sleep"):
+            self.assertIsNone(cmd.fetch_csv("http://x/E0.csv"))

@@ -78,6 +78,11 @@ TEAM_ALIASES = {
     "rayo vallecano": "vallecano",
     "real valladolid": "valladolid",
     "espanyol": "espanol",
+    "real betis": "betis",
+    "real oviedo": "oviedo",
+    "deportivo la coruna": "la coruna",
+    "sporting gijon": "sp gijon",
+    "sd huesca": "huesca",
     # Germany
     "borussia m gladbach": "mgladbach",
     "borussia dortmund": "dortmund",

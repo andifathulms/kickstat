@@ -25,16 +25,45 @@ from apps.matches.models import Match, MatchStats, MatchStatus, Referee
 
 BASE_URL = "https://www.football-data.co.uk/mmz4281"
 
-# Be polite to the static file host and resilient to transient errors.
+# Be polite to the static file host and resilient to transient errors. The
+# retry budget is generous because the path to this host is genuinely flaky:
+# on top of its broken certificate, ISP-level filtering intermittently answers
+# with a redirect to a block page or a MITM'd certificate, so an individual
+# attempt fails often enough that three is not enough to get a season through.
 REQUEST_DELAY_SECONDS = 0.5
-MAX_RETRIES = 3
+MAX_RETRIES = 8
+
+# These files carry a UTF-8 BOM but are decoded as latin-1 (the encoding the
+# rest of the file needs), which turns those three bytes into "ï»¿" rather than
+# U+FEFF. Both spellings have to be recognised.
+BOM_PREFIXES = ("﻿", "ï»¿")
+
+
+def looks_like_csv(text):
+    """Guard against a response that is HTML wearing a .csv URL.
+
+    Some ISPs intercept plain-HTTP-ish requests and answer with a redirect to a
+    filtering portal, which requests follows silently. The result parses as a
+    zero-row CSV, so the ingest would report "0 matches" for a season that is
+    perfectly fine upstream. Every football-data.co.uk file starts with the
+    same header, so check for it and treat anything else as a failed fetch.
+    """
+    if text is None:
+        return False
+    head = text.lstrip()
+    for bom in BOM_PREFIXES:
+        if head.startswith(bom):
+            head = head[len(bom):]
+            break
+    return head.startswith("Div,")
 
 
 def fetch_csv(url):
     """Download a CSV with retries. Returns text, or None if the file is absent.
 
     404 means the division/season doesn't exist -> skip (no retry). Transient
-    failures (timeouts, SSL, 5xx, rate-limit) are retried with backoff.
+    failures (timeouts, SSL, 5xx, rate-limit, interception) are retried with
+    backoff.
     """
     # The host's TLS certificate does not cover www.football-data.co.uk, so
     # verification fails. These are public, unauthenticated static CSVs — fall
@@ -58,8 +87,10 @@ def fetch_csv(url):
         if resp.status_code == 404:
             return None
         if resp.status_code == 200:
-            return resp.content.decode("latin-1")
-        # 403/429/5xx -> back off and retry
+            text = resp.content.decode("latin-1")
+            if looks_like_csv(text):
+                return text
+        # 403/429/5xx, or an intercepted response -> back off and retry
         if attempt == MAX_RETRIES:
             return None
         time.sleep(attempt * 2)
