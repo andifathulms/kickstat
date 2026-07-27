@@ -11,6 +11,16 @@ from apps.predictions.tasks import run_score_predictions
 from ml import poisson
 
 
+def _today_at(hour):
+    """A kickoff pinned inside today.
+
+    The tasks select on ``kickoff__date == today``, so an offset from "now"
+    silently lands on tomorrow when the suite runs near UTC midnight — the test
+    then finds no fixtures and fails for a reason unrelated to what it checks.
+    """
+    return timezone.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
 def _seed(league, scorer, weak, n=8):
     """Finished history: `scorer` wins big at home, `weak` loses."""
     base = timezone.now() - timedelta(days=60)
@@ -65,7 +75,7 @@ class RunScorePredictionsTaskTests(TestCase):
         _seed(self.league, self.strong, self.weak)
         self.today = make_match(
             self.league, self.strong, self.weak, external_id="today",
-            status=MatchStatus.SCHEDULED, kickoff=timezone.now() + timedelta(hours=2),
+            status=MatchStatus.SCHEDULED, kickoff=_today_at(12),
         )
 
     def test_creates_score_prediction(self):

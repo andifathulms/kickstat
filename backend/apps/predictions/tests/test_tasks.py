@@ -12,6 +12,16 @@ from ml import predict, train
 from .test_ml import clean_models, seed_history
 
 
+def _today_at(hour):
+    """A kickoff pinned inside today.
+
+    The tasks select on ``kickoff__date == today``, so an offset from "now"
+    silently lands on tomorrow when the suite runs near UTC midnight — the test
+    then finds no fixtures and fails for a reason unrelated to what it checks.
+    """
+    return timezone.now().replace(hour=hour, minute=0, second=0, microsecond=0)
+
+
 class RunDailyPredictionsTests(TestCase):
     def setUp(self):
         self.league = make_league()
@@ -21,7 +31,7 @@ class RunDailyPredictionsTests(TestCase):
         seed_history(self.league, self.teams, n=45)
         self.today_match = make_match(
             self.league, self.teams[0], self.teams[1], external_id="today",
-            status=MatchStatus.SCHEDULED, kickoff=timezone.now() + timedelta(hours=3),
+            status=MatchStatus.SCHEDULED, kickoff=_today_at(12),
         )
 
     def tearDown(self):
