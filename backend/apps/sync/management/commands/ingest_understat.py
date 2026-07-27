@@ -52,7 +52,14 @@ REQUEST_DELAY_SECONDS = 1.0
 MAX_RETRIES = 5
 
 # How far apart the two sources' kickoff stamps may sit for the same fixture.
-MATCH_WINDOW = timedelta(days=3)
+# Three days covers rows that carry no kickoff time; two weeks additionally
+# covers abandoned matches, which the two sources date differently — Understat
+# keeps the original fixture date, football-data.co.uk records the completion.
+# Udinese v Roma 2023/24 was suspended on 14 April and finished on the 25th.
+# A given home-and-away pairing occurs once per season and roughly a year apart
+# across seasons, so even this window leaves exactly one candidate; the
+# "exactly one match" check below remains the guard against a wrong merge.
+MATCH_WINDOW = timedelta(days=14)
 
 # Understat league code -> the football-data.co.uk division whose "(history)"
 # League row holds the matches we are enriching.

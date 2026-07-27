@@ -430,3 +430,34 @@ class EmptyRosterTests(MergeBaseTestCase):
         # The xG merge still lands; only the detail half is missing.
         self.assertEqual(MatchStats.objects.get(match=self.match).home_xg, 2.41)
         self.assertEqual(MatchLineup.objects.count(), 0)
+
+
+class AbandonedMatchTests(MergeBaseTestCase):
+    """Abandoned matches are dated from the original fixture by Understat and
+    from the completion by football-data.co.uk."""
+
+    def test_matches_across_an_eleven_day_gap(self):
+        # ENTRIES[0] kicks off 2023-10-29; the local row records completion on
+        # 2023-11-09, as with Udinese v Roma in 2023/24.
+        self.match.kickoff = datetime(2023, 11, 9, 19, 0, tzinfo=timezone.utc)
+        self.match.save(update_fields=["kickoff"])
+        run("--league", "EPL", "--season", "2023")
+        self.assertEqual(MatchStats.objects.get(match=self.match).home_xg, 2.41)
+
+    def test_a_month_apart_is_still_refused(self):
+        self.match.kickoff = datetime(2023, 12, 20, tzinfo=timezone.utc)
+        self.match.save(update_fields=["kickoff"])
+        run("--league", "EPL", "--season", "2023")
+        self.assertEqual(MatchStats.objects.count(), 0)
+
+    def test_two_candidates_in_window_are_refused(self):
+        Match.objects.create(
+            external_id="second-leg",
+            league=self.league,
+            home_team=self.city,
+            away_team=self.newcastle,
+            kickoff=datetime(2023, 11, 2, tzinfo=timezone.utc),
+            status=MatchStatus.FINISHED,
+        )
+        run("--league", "EPL", "--season", "2023")
+        self.assertEqual(MatchStats.objects.count(), 0)
