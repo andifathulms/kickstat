@@ -93,8 +93,16 @@ TEAM_ALIASES = {
     "eintracht frankfurt": "ein frankfurt",
     "vfb stuttgart": "stuttgart",
     "hertha berlin": "hertha",
-    "1 fc koln": "fc koln",
+    "1 koln": "koln",
+    "cologne": "koln",
     "mainz 05": "mainz",
+    "arminia bielefeld": "bielefeld",
+    "rasenballsport leipzig": "rb leipzig",
+    # Understat transliterates umlauts as ue/oe/ae; football-data.co.uk drops
+    # the diaeresis instead, so the two spellings never meet.
+    "fortuna duesseldorf": "fortuna dusseldorf",
+    "greuther fuerth": "greuther furth",
+    "nuernberg": "nurnberg",
     # Italy
     "internazionale": "inter",
     "hellas verona": "verona",

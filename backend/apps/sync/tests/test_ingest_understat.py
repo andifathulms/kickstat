@@ -384,3 +384,27 @@ class KickoffWindowTests(MergeBaseTestCase):
         self.match.save(update_fields=["kickoff"])
         run("--league", "EPL", "--season", "2023")
         self.assertEqual(MatchStats.objects.count(), 0)
+
+
+class TeamAliasTableTests(TestCase):
+    """The alias table is consulted with a normalised name, so its keys have to
+    already be normalised — and its values have to be normalised too, since
+    they are looked up against an index keyed by normalise(team.name)."""
+
+    def test_keys_are_already_normalised(self):
+        for key in cmd.TEAM_ALIASES:
+            self.assertEqual(
+                cmd.normalise(key), key, f"alias key {key!r} can never be hit"
+            )
+
+    def test_values_are_already_normalised(self):
+        for key, value in cmd.TEAM_ALIASES.items():
+            self.assertEqual(
+                cmd.normalise(value), value, f"alias {key!r} points at {value!r}"
+            )
+
+    def test_no_alias_points_at_another_alias_key(self):
+        for key, value in cmd.TEAM_ALIASES.items():
+            self.assertNotIn(
+                value, cmd.TEAM_ALIASES, f"alias {key!r} -> {value!r} chains"
+            )
