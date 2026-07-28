@@ -121,6 +121,9 @@ TEAM_ALIASES = {
     # France
     "paris saint germain": "paris sg",
     "saint etienne": "st etienne",
+    # Gazelec Ajaccio, not AC Ajaccio — two different clubs from the same city,
+    # both of which appear in this division's history.
+    "gfc ajaccio": "ajaccio gfco",
 }
 
 _NOISE_WORDS = re.compile(r"\b(fc|afc|cf|ac|ss|ssc|sc|cd|ud|rcd|as|us|calcio)\b")
